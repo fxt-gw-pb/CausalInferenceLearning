@@ -1,0 +1,308 @@
+{
+  "schemaVersion": 1,
+  "id": "w03-l01",
+  "week": 3,
+  "order": 1,
+  "title": "倾向得分的理论基础",
+  "summary": "由处理概率的平衡性质出发，连接匹配、分层、回归调整与加权，再扩展到连续剂量的条件密度。",
+  "status": "ready",
+  "readingMinutes": 32,
+  "tags": [
+    "平衡分数",
+    "匹配",
+    "分层",
+    "加权",
+    "广义倾向得分"
+  ],
+  "objectives": [
+    "解释真实倾向得分的平衡性质及估计得分的有限样本限制。",
+    "推导ATE与ATT权重对应的不同目标人群。",
+    "正确理解GPS、剂量反应和条件密度的单位。"
+  ],
+  "prerequisites": [
+    "第二周；条件概率、全期望、logistic回归"
+  ],
+  "sections": [
+    {
+      "id": "assignment",
+      "title": "倾向得分建模的是处理分配",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "e(W) = P(A=1 | W)",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "倾向得分给每个人一个接受处理1的条件概率，包括那些实际处于A=0的人。它的模型左侧是A，输入W应来自预先确定的处理前调整信息。把Y拿来当因变量会拟合结果模型，不能得到倾向得分。"
+        },
+        {
+          "type": "paragraph",
+          "text": "先看一张原创分配表：低风险层500人中100人接受提醒，e(0)=0.2；高风险层500人中400人接受提醒，e(1)=0.8。这个例子中PS只取两个值。因此，PS是0至1内的概率，并不要求它在人群中的分布连续。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "W层",
+            "总人数",
+            "A=1",
+            "A=0",
+            "e(W)"
+          ],
+          "rows": [
+            [
+              "低",
+              "500",
+              "100",
+              "400",
+              ".20"
+            ],
+            [
+              "高",
+              "500",
+              "400",
+              "100",
+              ".80"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "协变量多时，按所有组合直接算频率会出现稀疏格子。logistic或其他概率模型能把分配信息组织为一个估计得分，但模型形式、支持范围与平衡仍需检查。"
+        }
+      ]
+    },
+    {
+      "id": "balance",
+      "title": "平衡性质是分布层面的结论",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "A ⫫ W | e(W)",
+          "caption": "在给定真实倾向得分后，处理与已纳入得分的协变量向量独立。"
+        },
+        {
+          "type": "paragraph",
+          "text": "给定e(W)=s的所有人，他们接受A=1的条件概率都为s。对于这层中任何一个协变量子区域B，P(W∈B,A=1|e=s)=s P(W∈B|e=s)。再除以P(A=1|e=s)=s，可得处理者在B中的比例与整个得分层相同；对A=0亦然。这里要求0<s<1。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这个推导说明条件分布平衡，不要求同得分的两个人年龄、病史等每一个值都相同。实际拟合得分ê存在误差，分层还可能粗化，匹配也可能保留残余距离，所以理论性质不会自动变成有限样本精确平衡。"
+        },
+        {
+          "type": "callout",
+          "title": "平衡与因果识别是两层要求",
+          "text": "真实PS平衡的是W。还需给定W的交换性、一致性和正性，才能据此识别因果效应。未测共同原因不会因为PS相似而自动消失。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "four-uses",
+      "title": "同一个得分的四种用法",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "用法",
+            "操作",
+            "需要明确的目标与限制"
+          ],
+          "rows": [
+            [
+              "匹配",
+              "寻找得分接近的处理者和对照者",
+              "常围绕处理者估ATT；丢弃处理者可能进一步改变目标"
+            ],
+            [
+              "分层",
+              "按PS划分组，在层内比较后按目标权重平均",
+              "少量宽层可能仍有残余混杂，稀疏层会不稳定"
+            ],
+            [
+              "结果回归调整",
+              "用A与PS等变量拟合Y",
+              "仍依赖结果函数形式；没有自动产生匹配或加权后人群"
+            ],
+            [
+              "逆概率加权",
+              "依据各人实际处理的概率赋权",
+              "权重由ATE、ATT等目标决定，需检查尾部与有效样本量"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "方法不能只凭哪一个结果更显著来选择。先定目标，再比较是否有支持、是否平衡、损失多少信息以及不确定性怎样估计。把四种方法所有输出都命名为ATE，会掩盖它们可能在平均不同的人群。"
+        }
+      ]
+    },
+    {
+      "id": "ipw",
+      "title": "ATE逆概率加权的推导",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "w_ATE = A/e(W) + (1−A)/(1−e(W))",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "在上述分配表中，低风险处理者权重5，高风险处理者权重1.25；低风险对照者权重1.25，高风险对照者权重5。加权后，两组的低、高风险人数都各为500。权重较大的观察代表其特征下较少走到该处理路径的人。"
+        },
+        {
+          "type": "equation",
+          "text": "E[AY/e(W) | W] = E[Y | A=1,W] = Q₁(W)",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "第一个等号由条件期望展开：A=0时这一项为0，A=1出现的概率e(W)与分母抵消。再对W平均，并使用识别条件，得到E[AY/e(W)]=E[Y(1)]。对照组同理。因此两个加权均值之差可估计ATE。"
+        },
+        {
+          "type": "equation",
+          "text": "Horvitz–Thompson：μ̂₁ = n⁻¹Σ AᵢYᵢ/êᵢ；Hájek：μ̂₁ = Σ AᵢYᵢ/êᵢ ÷ Σ Aᵢ/êᵢ",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "前者以原样本量n归一，后者以该组权重总和归一。有限样本中它们可以不同；在适当条件下二者都可一致。教学代码若采用后者，应说明是归一化加权均值。稳定化权重再乘处理边际比例，在各组归一化均值中该常数会抵消，不能因此宣称极端权重或方差问题全部消失。"
+        }
+      ]
+    },
+    {
+      "id": "att",
+      "title": "ATT把对照组带到处理者人群",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "w_ATT：A=1时为1；A=0时为e(W)/(1−e(W))",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "处理者的W分布与总体不同：低风险占20%，高风险占80%。ATT保留处理者的权重1，对照者低风险权重0.25、高风险权重4，于是加权对照的两层人数为100和400，复制处理者构成。公式来自f(W|A=1)与f(W|A=0)的密度比，其中不影响组内归一化的常数可约去。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若条件风险仍为Q₀=(.20,.50)、Q₁=(.10,.30)，ATE为−.15；ATT按20%/80%平均，处理风险=.26，对照风险=.44，差为−.18。二者不同源于目标人群及效应异质性；不能把这个差直接视作某个方法更有偏。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "n1 <- c(100,400); n0 <- c(400,100)\ny1 <- c(10,120); y0 <- c(80,50)\ne <- c(.2,.8)\nate1 <- sum(y1/e)/sum(n1/e)\nate0 <- sum(y0/(1-e))/sum(n0/(1-e))\natt1 <- sum(y1)/sum(n1)\natt0 <- sum(y0*e/(1-e))/sum(n0*e/(1-e))\nc(ATE=ate1-ate0, ATT=att1-att0)\nstopifnot(abs(ate1-ate0+.15)<1e-12,\n          abs(att1-att0+.18)<1e-12)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        }
+      ]
+    },
+    {
+      "id": "continuous",
+      "title": "连续剂量需要条件密度",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "当A是连续的服务剂量，例如联系时长，P(A恰好等于某个值|W)通常为0。广义倾向得分GPS使用条件密度r(a,W)=f(A=a|W)。密度是每单位剂量的概率密集程度，不是某一个精确剂量的概率。"
+        },
+        {
+          "type": "equation",
+          "text": "若 A|W ~ Normal(μ(W),σ²)，r(a,W) = [1/(√(2π)σ)] exp{−(a−μ(W))²/(2σ²)}",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "这是正态同方差工作分布，需要论证和诊断；线性回归本身不会保证残差服从该分布。其他条件密度模型也可使用。σ=0.1时均值处密度约3.989，完全可以大于1。把分钟改成小时，数值密度也随单位改变，但相应区间概率保持一致。"
+        },
+        {
+          "type": "paragraph",
+          "text": "只按预测均值E[A|W]分层，不一定平衡连续处理。例如两个W层的A均值同为0，一个标准差1、另一个标准差3。只看均值无法区分，但观察到很大的|A|会透露更可能来自后一层。零相关也不能证明整个条件分布独立。"
+        },
+        {
+          "type": "equation",
+          "text": "剂量反应 μ(a)=E[Y(a)]；目标对比 Δ(a₁,a₀)=μ(a₁)−μ(a₀)",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "基于GPS结果模型时，先拟合E[Y|A,R]，其中每人的R=r(A,W)按实际剂量计算。预测某干预剂量a时，必须为每个人重新计算r(a,W)，代入(a,r(a,W))预测后平均。含A×R交互时，单独A系数连固定R下的共同斜率都不是，更不能直接称平均剂量效应。离散0至9评分若按连续处理建模，还需说明近似及边界；在9分者上统一加1已越出支持。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "自测与推导检查",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w03-l01-weight",
+          "prompt": "e(W)=0.8的对照者，在ATE分析中的非稳定权重为：",
+          "options": [
+            "1/0.8=1.25",
+            "1/(1−0.8)=5",
+            "0.8"
+          ],
+          "answer": 1,
+          "explanation": "对照者走的是A=0路径，其概率为1−e=0.2，因此逆概率权重为5。e始终定义为A=1概率。"
+        },
+        {
+          "type": "exercise",
+          "id": "w03-l01-target",
+          "prompt": "ATT权重把对照组带到哪个人群的W分布？",
+          "options": [
+            "全体样本",
+            "实际处理者",
+            "原始对照者"
+          ],
+          "answer": 1,
+          "explanation": "处理者权重保留1，对照者乘e/(1−e)，目标是处理者构成。重叠不足或进一步删人时，仍要重新说明实际目标。"
+        },
+        {
+          "type": "exercise",
+          "id": "w03-l01-gps",
+          "prompt": "GPS密度为2.5意味着：",
+          "options": [
+            "程序一定算错，因为必须小于1",
+            "该值可能合法，须结合剂量单位和区间理解",
+            "接受该精确剂量的概率是250%"
+          ],
+          "answer": 1,
+          "explanation": "连续密度可大于1，积分才得到概率。它不同于二元处理的概率e(W)。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "rosenbaum-rubin",
+      "title": "The central role of the propensity score in observational studies for causal effects",
+      "authors": "Paul R. Rosenbaum; Donald B. Rubin",
+      "year": 1983,
+      "url": "https://academic.oup.com/biomet/article-abstract/70/1/41/240879",
+      "locator": "倾向得分定义与平衡性质；Biometrika 70(1):41–55"
+    },
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第12章：IP weighting；第15章：倾向得分、分层和匹配"
+    },
+    {
+      "id": "hirano-imbens",
+      "title": "The Propensity Score with Continuous Treatments",
+      "authors": "Keisuke Hirano; Guido W. Imbens",
+      "year": 2004,
+      "url": "https://doi.org/10.1002/0470090456.ch7",
+      "locator": "Generalized propensity score与剂量反应估计"
+    }
+  ],
+  "exerciseIds": [
+    "w03-l01-weight",
+    "w03-l01-target",
+    "w03-l01-gps"
+  ],
+  "codeStatus": "not-run"
+}

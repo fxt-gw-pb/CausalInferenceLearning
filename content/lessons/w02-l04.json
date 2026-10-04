@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "id": "w02-l04",
+  "week": 2,
+  "order": 4,
+  "title": "潜在结果与标准化",
+  "summary": "潜在结果；目标人群；直接标准化。",
+  "status": "ready",
+  "readingMinutes": 12,
+  "tags": [
+    "潜在结果",
+    "目标人群",
+    "直接标准化"
+  ],
+  "objectives": [
+    "明确标准化使用的目标人群分布。",
+    "计算两种干预下的平均风险与风险差。",
+    "区分数值计算与因果识别所需的条件。"
+  ],
+  "prerequisites": [
+    "条件概率与加权均值",
+    "潜在结果的基本记号"
+  ],
+  "sections": [
+    {
+      "id": "target",
+      "title": "目标人群与潜在结果",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "设 A 为二元处理，Y 为在预先规定的随访时间内是否出现某结局，W 为处理前的风险层。Y(1) 和 Y(0) 分别表示同一个人在接受两种处理时的潜在结果。对一个固定目标人群，我们关心全部人接受 A = 1 与全部人接受 A = 0 时的平均风险差。"
+        },
+        {
+          "type": "equation",
+          "text": "ψ = E[Y(1)] − E[Y(0)]",
+          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mi>ψ</mi><mo>=</mo><mi mathvariant=\"normal\">E</mi><mo>[</mo><mi>Y</mi><mo>(</mo><mn>1</mn><mo>)</mo><mo>]</mo><mo>−</mo><mi mathvariant=\"normal\">E</mi><mo>[</mo><mi>Y</mi><mo>(</mo><mn>0</mn><mo>)</mo><mo>]</mo></math>",
+          "caption": "当 Y 为二元结局时，ψ 的尺度为风险差。乘以 100 后用百分点表示。"
+        },
+        {
+          "type": "paragraph",
+          "text": "期望始终相对于同一个目标人群。更换目标人群会改变平均时的权重；若不同风险层的处理效应不同，平均效应也会随之变化。"
+        }
+      ]
+    },
+    {
+      "id": "identification",
+      "title": "从层内风险到标准化",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "令 Qₐ(w) = E[Y | A = a, W = w]。在干预定义明确、结果与实际处理满足一致性，且给定 W 后满足条件交换性与正性的条件下，可以用观测到的层内均值识别相应潜在结果均值。"
+        },
+        {
+          "type": "equation",
+          "text": "E[Y(a)] = Σw Qₐ(w) P(W = w)",
+          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mi mathvariant=\"normal\">E</mi><mo>[</mo><mi>Y</mi><mo>(</mo><mi>a</mi><mo>)</mo><mo>]</mo><mo>=</mo><munder><mo>∑</mo><mi>w</mi></munder><msub><mi>Q</mi><mi>a</mi></msub><mo>(</mo><mi>w</mi><mo>)</mo><mi mathvariant=\"normal\">P</mi><mo>(</mo><mi>W</mi><mo>=</mo><mi>w</mi><mo>)</mo></math>",
+          "caption": "对每种干预都使用相同的 P(W = w)。本例 W 只有低风险、高风险两层。"
+        },
+        {
+          "type": "list",
+          "ordered": true,
+          "items": [
+            "全期望：先在 W 的每一层求潜在结果均值，再按目标人群的层比例平均。",
+            "条件交换性：在同一风险层内，接受处理 a 的人能够代表该层在处理 a 下的潜在结果均值。",
+            "一致性：实际接受 a 时，观测结果与 Y(a) 相联系。正性保证目标人群中需要的处理与风险层组合有数据支持。"
+          ]
+        },
+        {
+          "type": "callout",
+          "title": "识别条件的边界",
+          "text": "上述条件需要研究设计与领域知识支持。仅有良好的预测表现、协变量显著性检验或一个计算结果，均不足以建立因果解释。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "synthetic-example",
+      "title": "两层人群的计算",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "以下概率完全为教学构造。低风险层中，未处理风险为 12%，处理风险为 8%；高风险层中，相应风险为 36% 和 26%。原始处理组的高风险者较多，占 80%；原始未处理组中仅占 20%。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "风险层 W",
+            "Q₀(W)",
+            "Q₁(W)",
+            "层内风险差"
+          ],
+          "rows": [
+            [
+              "低风险层",
+              "12%",
+              "8%",
+              "−4 个百分点"
+            ],
+            [
+              "高风险层",
+              "36%",
+              "26%",
+              "−10 个百分点"
+            ]
+          ],
+          "caption": "独立构造的合成概率；不来自真实研究或课程输出。"
+        },
+        {
+          "type": "paragraph",
+          "text": "直接比较两组观测风险，得到处理组 22.4%，未处理组 16.8%，粗风险差为 +5.6 个百分点。这个差同时混合了层内风险和两组构成差异。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若目标人群的高风险者占 50%，则两种处理都用 50% / 50% 加权。未处理风险为 24.0%，处理风险为 17.0%，标准化风险差为 −7.0 个百分点。该计算可独立逐项验算，不涉及模型拟合。"
+        },
+        {
+          "type": "interactive",
+          "kind": "standardization"
+        }
+      ]
+    },
+    {
+      "id": "interpretation",
+      "title": "区分效果尺度与平均权重",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "风险差 −7 个百分点表示两个风险的绝对差。相同例子中的风险比为 0.17 / 0.24 ≈ 0.708，表达的是相对关系。风险差、风险比和优势比各有定义，不能直接互换标签。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例高风险层的风险差更负。因此，把目标人群中高风险者的比例从 0% 调到 100%，标准化风险差会由 −4 变为 −10 个百分点。滑块改变的是研究目标中的人群构成，并未改变任何层内风险。"
+        },
+        {
+          "type": "callout",
+          "title": "关于目标人群的迁移",
+          "text": "这里把两个风险层及其风险当作合成总体的固定设定。真实研究若要把结果推广到样本以外的人群，还需要说明结果模型的可迁移性和该人群的支持范围。"
+        }
+      ]
+    },
+    {
+      "id": "r-code",
+      "title": "用 R 复算加权均值",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "下面只使用 base R；它独立表达本页的加权计算。当前环境未运行这段 R，页面交互使用的 JavaScript 算术另外经过自动化测试。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 独立构造的教学概率，非研究数据\nq0 <- c(0.12, 0.36)\nq1 <- c(0.08, 0.26)\np_high <- 0.50\nw <- c(1 - p_high, p_high)\n\nstopifnot(all(w >= 0), abs(sum(w) - 1) < 1e-12)\nmu0 <- sum(w * q0)\nmu1 <- sum(w * q1)\nrd <- mu1 - mu0\nrr <- mu1 / mu0\n\nc(risk_0 = mu0, risk_1 = mu1, RD = rd, RR = rr)\nstopifnot(abs(rd - (-0.07)) < 1e-12)",
+          "caption": "预期算术值：risk_0 = 0.24，risk_1 = 0.17，RD = −0.07。此处没有用计算结果代替对识别条件的判断。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "自测与解释",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w02-l04-target",
+          "prompt": "目标人群的高风险者占 50%。请选择计算两种干预下风险时应采用的权重。",
+          "options": [
+            "A = 1 用 80%，A = 0 用 20% 的高风险权重",
+            "两种干预都使用 50% 的高风险权重",
+            "选用风险差绝对值更小的那组权重"
+          ],
+          "answer": 1,
+          "explanation": "目标人群固定后，两种干预都按相同的目标分布平均。分别使用原始两组的构成，会回到未经标准化的两组比较。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l04-effect",
+          "prompt": "把目标人群的高风险比例从 50% 改为 100%，请选择本例的标准化风险差。",
+          "options": [
+            "−7 个百分点",
+            "+5.6 个百分点",
+            "−10 个百分点"
+          ],
+          "answer": 2,
+          "explanation": "100% 高风险时只保留高风险层：26% − 36% = −10 个百分点。原始两组构成未变，因此它们的粗风险差仍为 +5.6 个百分点。"
+        },
+        {
+          "type": "paragraph",
+          "text": "完成本节后，可以用一句话说明：自己计算了哪个人群、哪个时间窗、哪两种干预和哪个效果尺度，并列出从关联解释到因果解释所需的条件。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "hernan-robins-what-if",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán & James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第 2.3 节标准化；第 3.1 节识别条件。参照作者提供的 2025-01-02 在线修订版。"
+    }
+  ],
+  "exerciseIds": [
+    "w02-l04-target",
+    "w02-l04-effect"
+  ],
+  "codeStatus": "not-run",
+  "statusNote": "本节用两层合成人群演示标准化，交互只改变目标人群构成。"
+}

@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "id": "w07-l01",
+  "week": 7,
+  "order": 1,
+  "title": "缺失机制与插补",
+  "summary": "把缺失机制、选择偏差和因果识别分开；从数据类型、辅助信息和模型结构设计多重插补。",
+  "status": "ready",
+  "readingMinutes": 27,
+  "tags": [
+    "MCAR",
+    "MAR",
+    "MNAR",
+    "缺失模式"
+  ],
+  "objectives": [
+    "用观测指示定义 MCAR、MAR 和 MNAR",
+    "说明完整个案分析可能改变目标人群",
+    "设计包含结局信息的协变量插补模型",
+    "区分插补份数、迭代次数、诊断与敏感性分析"
+  ],
+  "prerequisites": [
+    "条件独立；w03-l01；基础 R 数据类型"
+  ],
+  "sections": [
+    {
+      "id": "missingness",
+      "title": "缺失描述与分析目标",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "先写出完整资料中希望观察的变量，再标记实际哪些单元格缺失。设 D 为完整资料，R 为观测指示或缺失模式，Dobs 与 Dmis 分别表示该模式下的已观测和未观测部分。缺失带来三个可能后果：有效信息减少、样本组成改变、识别所需的协变量缺失。它们需要分别处理。"
+        },
+        {
+          "type": "paragraph",
+          "text": "逐列缺失比例与完整个案比例回答不同问题。某资料有 100 人、4 个分析变量，每列各缺 10 人；若四列缺的是同一批人，完整个案有 90 人；若互不重合，只剩 60 人。因此应同时给出逐列比例、联合缺失模式，以及特定分析变量集下的完整个案数。"
+        },
+        {
+          "type": "list",
+          "items": [
+            "保留变量字典：取值、单位、采集时点、结构性缺失和意外漏测。",
+            "对分析列与全表分别统计缺失，避免为了让图简洁而遗漏数值汇总。",
+            "记录缺失原因和辅助变量的可获得性，先核查无需插补或不应插补的情况。"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mechanisms",
+      "title": "三种机制的条件定义",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "机制",
+            "定义",
+            "教学情境"
+          ],
+          "rows": [
+            [
+              "MCAR",
+              "P(R=r∣D)=P(R=r)",
+              "独立随机损坏一部分样本的测量结果"
+            ],
+            [
+              "MAR",
+              "P(R=r∣Dobs,Dmis)=P(R=r∣Dobs)",
+              "测量参与率依赖已完整观察的基线年龄；给定年龄等必要信息后，与未测值无关"
+            ],
+            [
+              "MNAR",
+              "给定 Dobs 后，缺失仍依赖 Dmis",
+              "在相同已观测特征下，未观测指标越高者越不愿报告"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "MAR 的关键是条件化后剩下的独立性。发现老年人更容易漏测，只说明缺失与年龄有关；若漏测还依赖未观察到的严重程度，机制仍可能是 MNAR。MAR 也相对于保留的观测信息定义：删除有用的辅助变量可能使这一假设更难成立。"
+        },
+        {
+          "type": "paragraph",
+          "text": "缺失模式图、对 R 的回归和缺失组/完整组的比较能够揭示与已观测变量的联系，通常不能从这些检验确认一般 MAR。未拒绝 MCAR 检验也不能证明 MCAR。机制判断需要数据收集过程、专业信息及敏感性分析。"
+        },
+        {
+          "type": "callout",
+          "title": "不采用固定比例决策",
+          "text": "5% 或 30% 这样的比例不构成删除或插补的识别条件。少量但有选择性的缺失也可造成偏差；高缺失比例意味着信息有限，仍需看辅助信息、目标与模型。删除混杂变量可能新增混杂。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "selection",
+      "title": "完整个案改变人群的算例",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "设总体中低、高风险两层各占一半，完整资料的均值分别为 10 和 30。低层有 80% 完整，高层有 20% 完整，且每层内部是否完整与结局独立。总体均值为 20；完整个案中两层的比例变成 80% 与 20%，直接平均得到 14。即使层内结局模型没有偏差，平均时使用了错误的人群组成仍会出错。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "population=[0.5,0.5]\nobserved=[0.8,0.2]\nlayer_mean=[10,30]\ncomplete_mass=[w*r for w,r in zip(population,observed)]\ncomplete_weight=[v/sum(complete_mass) for v in complete_mass]\ntarget=sum(w*y for w,y in zip(population,layer_mean))\ncomplete=sum(w*y for w,y in zip(complete_weight,layer_mean))\nassert target==20 and complete==14\nprint(target,complete,complete_weight)",
+          "execution": "verified",
+          "caption": "原创分层选择算例，已执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "在因果分析中，若效应随协变量变化，直接对完整个案平均会相应改变 ATE 的目标人群。条件结果模型在完整个案中可估，不代表对完整个案分布标准化就恢复原总体 ATE。若原总体协变量分布仍可获知，且层内观测条件与正性合理，可以考虑向原总体重新标准化；这需要明确的识别论证。"
+        },
+        {
+          "type": "paragraph",
+          "text": "完整个案分析与删除一个缺失变量的含义不同。前者改变样本，后者改变调整集。一个变量的缺失即使符合 MCAR，它仍可能是 A 与 Y 的重要共同原因。"
+        }
+      ]
+    },
+    {
+      "id": "imputation",
+      "title": "插补模型的结构",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "多重插补为缺失单元格产生多份合理的值，每份都保留原有观测值，再分别进行同一目标分析。插补模型应传播对缺失值与相关参数的不确定性。把同一个均值重复填入二十份表格不能达到这个目的。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "变量或结构",
+            "设计要点"
+          ],
+          "rows": [
+            [
+              "连续变量",
+              "可考虑参数模型或预测均值匹配 PMM；查看分布与供体支持"
+            ],
+            [
+              "二分类/多分类",
+              "明确类别和参照水平；采用相应模型，防止代码当连续量"
+            ],
+            [
+              "A、Y 与基线 W",
+              "为缺失协变量插补保留与 A、Y 的关系；倾向模型仍由基线协变量预测 A"
+            ],
+            [
+              "辅助信息",
+              "纳入合理的缺失与待插补值的预测信息，注意时间和资料可获得性"
+            ],
+            [
+              "标识码与派生量",
+              "无意义 ID 排除；由原变量重建派生量或设计相容的被动插补"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "PMM 从观测供体中抽取值；若供体只有 0 和 1，它不会凭空生成 0.3。选择二分类 logistic 插补的理由应来自变量类型、条件模型与分析需求，不能以虚构的 PMM 小数错误论证。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若分析包含 A 与某混杂因素的交互、非线性或复杂因果估计器，默认主效应插补模型可能不足以保持目标关系。FCS 条件模型之间的兼容性与插补/分析的协调性是两类问题；使用相同列名并不自动满足它们。"
+        }
+      ]
+    },
+    {
+      "id": "r-design",
+      "title": "可复用的模拟与插补设置",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 本节及后两节沿用此原创模拟；R 未运行。\nstopifnot(requireNamespace(\"mice\", quietly=TRUE))\nset.seed(701)\nn <- 1200L\nX <- rnorm(n)\nL <- 0.5*X + rnorm(n)\nA <- rbinom(n,1,plogis(0.4*X+0.6*L))\nY <- rbinom(n,1,plogis(-0.8-0.5*A+0.3*X+0.5*L))\nd <- data.frame(id=seq_len(n), X=X, L=L, A=A, Y=Y)\n# L 的缺失仅由仍被观测的 X 和 Y 决定，是明确的模拟 MAR 机制。\nmissing_L <- rbinom(n,1,plogis(-1+0.6*X+0.4*Y))==1\nd$L[missing_L] <- NA_real_\ncolMeans(is.na(d))\nmean(complete.cases(d))\nini <- mice::mice(d,maxit=0,printFlag=FALSE)\nmethods <- ini$method\nmethods[] <- \"\"\nmethods[\"L\"] <- \"pmm\"\npred <- ini$predictorMatrix\npred[,] <- 0\npred[\"L\",c(\"X\",\"A\",\"Y\")] <- 1\nimp <- mice::mice(d,m=20,maxit=10,method=methods,\n    predictorMatrix=pred,seed=702,printFlag=FALSE)\nplot(imp)\nimp$loggedEvents\nmice::densityplot(imp, ~L)",
+          "execution": "not-run",
+          "caption": "R 未执行。m=20、maxit=10 是教学起点，需要诊断后再决定；本例不提供 MI 推断有效性的自动保证。"
+        },
+        {
+          "type": "paragraph",
+          "text": "该模拟让 A 和 Y 完整、L 部分缺失。Y 可以作为缺失协变量 L 的插补预测变量；这不要求把 Y 放到 A 的倾向模型右侧。重新读取资料时应重新应用变量类型、编码和预测矩阵设置，不能依赖上一次会话留下的对象。"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "title": "诊断、不确定性与敏感性",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "m 控制完成数据集份数，maxit 控制每条链迭代次数。增加 m 主要减少插补 Monte Carlo 误差；增加迭代主要服务于算法稳定性。",
+            "查看链轨迹、不同起点、日志、观测与插补分布以及条件分布；分布相似或轨迹平稳不能证明 MAR。",
+            "保持分析中的干预、结局、协变量和目标人群不变，每份保存点估计与合适方差。",
+            "对合理 MNAR 偏离构造敏感性情景，例如对缺失连续变量在明确尺度上施加预设偏移；重新完整分析并说明偏移依据。"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "随机森林可以出现在插补程序中，但算法名字不说明它是否传播了多重插补所需的不确定性。一次确定性预测填补与适当多重插补具有不同的推断含义。固定随机种子提供可重复性，不提供正确性。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w07-l01-mechanism",
+          "prompt": "仅观察到缺失与已测年龄有关，可以作出哪项判断？",
+          "options": [
+            "已证明 MAR",
+            "可反对某些 MCAR 假设，但 MAR 与 MNAR 仍需额外判断",
+            "应直接删除年龄"
+          ],
+          "answer": 1,
+          "explanation": "该关联说明缺失过程可能依赖年龄。MAR 还要求给定已观测信息后不再依赖未观测值；现有相关性检验没有验证后半句。删除年龄也可能损害插补与混杂控制。"
+        },
+        {
+          "type": "exercise",
+          "id": "w07-l01-m-iterations",
+          "prompt": "m=30、maxit=15 的通常含义是什么？",
+          "options": [
+            "30 份完成数据，每条插补链迭代 15 次",
+            "450 份独立样本",
+            "每份增加 15 个观测"
+          ],
+          "answer": 0,
+          "explanation": "m 与迭代次数控制不同过程。它们都不会创造额外独立受试者；对同一批人的多份合理完成资料须在分析后合并。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "mice",
+      "title": "mice: Multivariate Imputation by Chained Equations in R",
+      "authors": "Stef van Buuren; Karin Groothuis-Oudshoorn",
+      "year": 2011,
+      "url": "https://www.jstatsoft.org/article/view/v045i03",
+      "locator": "FCS、插补方法与诊断"
+    },
+    {
+      "id": "mice-doc",
+      "title": "mice function reference",
+      "authors": "mice package authors",
+      "year": "在线文档",
+      "url": "https://amices.org/mice/reference/mice.html",
+      "locator": "method, predictorMatrix, m, maxit, passive imputation"
+    },
+    {
+      "id": "pool-scalar",
+      "title": "Multiple imputation pooling: univariate version",
+      "authors": "mice package authors",
+      "year": "在线文档",
+      "url": "https://amices.org/mice/reference/pool.scalar.html",
+      "locator": "Q、U、合并方差与自由度"
+    }
+  ],
+  "exerciseIds": [
+    "w07-l01-mechanism",
+    "w07-l01-m-iterations"
+  ],
+  "codeStatus": "not-run"
+}

@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "id": "w01-l08",
+  "week": 1,
+  "order": 8,
+  "title": "数据整理导学",
+  "summary": "为后续统计分析建立数据整理方案：保留原始字段、记录变量时序，用小测试验证每一步。",
+  "status": "ready",
+  "readingMinutes": 14,
+  "tags": [
+    "数据整理的操作入口"
+  ],
+  "objectives": [
+    "把选人、选列、派生变量和改类型分开。",
+    "写出数据字典与目标分析表的验收条件。",
+    "用理论、代码、小作业和反馈形成可重复学习循环。"
+  ],
+  "prerequisites": [
+    "w01-l01至w01-l07"
+  ],
+  "sections": [
+    {
+      "id": "workflow",
+      "title": "从可运行代码走向可解释流程",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "前几课已经能读表和取子集。本课先整理工作方式，再进入具体语法。因果分析中的清洗决定谁进入目标比较、哪些信息来自处理前、结局怎样计数。它直接影响估计目标，因此需要像模型公式一样认真记录。"
+        },
+        {
+          "type": "paragraph",
+          "text": "可以用两个相互独立的小案例练习迁移：课堂例子分析预约提醒，练习例子分析培训通知与课程完成。第二个案例保留相同的结构A、W、Y，却更换字段名、编码与单位。能解释每个映射的含义，比照着同一份脚本反复运行更能检验理解。"
+        }
+      ]
+    },
+    {
+      "id": "contract",
+      "title": "为一张分析表写清规则",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "原始字段",
+            "含义与时点",
+            "整理决定"
+          ],
+          "rows": [
+            [
+              "pid",
+              "匿名人员编号",
+              "检查重复，确定一人一行"
+            ],
+            [
+              "eligible",
+              "登记时满足纳入条件，0/1",
+              "先报告不满足及缺失人数"
+            ],
+            [
+              "notice",
+              "登记时分配通知，0/1",
+              "保留A方向，不随输出符号改码"
+            ],
+            [
+              "score_pre",
+              "通知前测量的基础评分",
+              "作为候选基线W"
+            ],
+            [
+              "score_after",
+              "通知后测量的参与感评分",
+              "保留来源，暂不作为总效应调整变量"
+            ],
+            [
+              "completed30",
+              "30天内完成，0/1或缺失",
+              "核实窗口和随访完整性"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "选人改变行数，选列改变信息范围，派生变量新增定义，类型转换改变软件如何解释已有值。这四种操作应分步写，暂时不要急着压成一条很长的管道。"
+        }
+      ]
+    },
+    {
+      "id": "example",
+      "title": "把处理前后的字段分开",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "raw <- data.frame(\n  pid = 1:6, eligible = c(1, 1, 0, 1, 1, 1),\n  notice = c(0, 1, 1, 0, 1, 0),\n  score_pre = c(30, 40, 50, 60, 70, 80),\n  score_after = c(35, 60, 65, 65, 85, 83),\n  completed30 = c(0, 1, 1, 1, 1, NA)\n)\nkeep <- !is.na(raw$eligible) & raw$eligible == 1\neligible_data <- raw[keep, , drop = FALSE]\nanalysis <- eligible_data[c(\"pid\", \"notice\", \"score_pre\", \"completed30\")]\nanalysis$A <- analysis$notice\nanalysis$Y <- analysis$completed30\nstopifnot(nrow(raw) == 6, nrow(analysis) == 5,\n          !anyDuplicated(analysis$pid))\nc(eligible = nrow(analysis), outcome_missing = sum(is.na(analysis$Y)))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这段程序留下5位符合条件的人，其中1人的结局缺失。score_after不进入当前分析表，是因为本练习目标为通知的总效应，处理后的参与感可能处在作用路径上。原始raw仍保留该列，日后有明确中介问题时可以重新设计分析。"
+        }
+      ]
+    },
+    {
+      "id": "audit",
+      "title": "小测试比目测更容易发现错误",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "数量测试：纳入、排除和缺失的计数能否对应总人数。",
+            "值域测试：A、Y是否真的只有允许的码值；是否出现未预期水平。",
+            "单位测试：同一个示例值手算一次，防止厘米、米或百分数混用。",
+            "边界测试：专门放入等于阈值的人，检查进入哪个组。",
+            "来源测试：原始变量仍保留，派生变量有新名字，脚本能从空白会话完整重建。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "paragraph",
+          "text": "学习时可以每节留三样东西：一句目标说明、一段从头可运行的原创代码、一条失败过但已解释的检查。遇到错误时记录最小复现数据、完整报错、所用版本和期望输出。不要只截图最后一行，也不要把真实敏感数据复制到公开讨论。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "迁移作业",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w01-l08-timing",
+          "prompt": "通知后测量的score_after能显著预测课程完成，估计通知总效应时应：",
+          "options": [
+            "因为显著就一定调整",
+            "先判断其因果角色和时序，不能只由预测能力决定",
+            "删除整个原始字段且不保留"
+          ],
+          "answer": 1,
+          "explanation": "处理后变量可能是中介或选择机制的一部分。预测能力与是否应调整不同；应保留原始信息，但在明确目标下设计模型。"
+        },
+        {
+          "type": "paragraph",
+          "text": "作业：给上面的模拟表增加height_cm和weight_kg两列，计划新增bmi_calc，但本节先不写公式。写出两列的单位、允许范围、缺失处理和至少两个验算点。下一课再实现并比较计划与程序是否一致。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第6–7章：因果图与混杂；第13章：从设计到标准化"
+    },
+    {
+      "id": "r-data.frame",
+      "title": "R Documentation: data.frame",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/data.frame.html",
+      "locator": "数据框列长度及类型"
+    }
+  ],
+  "exerciseIds": [
+    "w01-l08-timing"
+  ],
+  "codeStatus": "not-run"
+}

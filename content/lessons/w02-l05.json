@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "id": "w02-l05",
+  "week": 2,
+  "order": 5,
+  "title": "参数 G 计算",
+  "summary": "从识别公式推到模型、两份干预输入、逐人预测和目标人群平均，理解参数G计算的每一步。",
+  "status": "ready",
+  "readingMinutes": 24,
+  "tags": [
+    "结果模型",
+    "干预预测",
+    "平均与比较"
+  ],
+  "objectives": [
+    "逐步解释点处理G公式的识别依据。",
+    "从条件结果模型得到边际风险与RD/RR/OR。",
+    "区分逐人预测后平均、平均协变量处预测和恢复个体结果。"
+  ],
+  "prerequisites": [
+    "w01-l03、w02-l04；条件期望和加权平均"
+  ],
+  "sections": [
+    {
+      "id": "identify",
+      "title": "识别公式的三次连接",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "固定基线处理A、结局Y和处理前协变量W。目标是某一指定人群全部接受a时的平均结果μₐ=E[Y(a)]。先把人群按W分解，再用观测条件均值替换潜在结果均值。以下推导只针对一次基线处理；时间变化处理与反馈需要更完整的纵向公式。"
+        },
+        {
+          "type": "equation",
+          "text": "E[Y(a)] = E_W{E[Y(a)|W]} = E_W{E[Y(a)|A=a,W]} = E_W{E[Y|A=a,W]}",
+          "caption": ""
+        },
+        {
+          "type": "list",
+          "items": [
+            "第一步使用全期望：先算每类W的潜在结果均值，再按目标分布平均。",
+            "第二步使用条件交换性：给定W后，实际接受a者代表该层在a下的潜在结果均值。",
+            "第三步使用一致性：实际接受a时，Y(a)等于观测Y。",
+            "正性为这些条件均值提供数据支持；若目标人群某类W从无A=a，模型预测可能依赖外推。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "paragraph",
+          "text": "识别公式是总体层面的关系。参数G计算再用一个具有指定函数形式的模型估计Qₐ(W)=E[Y|A=a,W]。模型正确或足够好的估计是这一估计路线的额外要求，不能替代前面的识别条件。"
+        }
+      ]
+    },
+    {
+      "id": "algorithm",
+      "title": "把同一目标人群置于两种策略下",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "拟合结果模型Q(A,W)，明确结局家族、链接、非线性及交互。",
+            "复制目标人群的W，分别把处理设为1和0；其他基线值保持相同。",
+            "对两份输入分别计算每个人的预测均值或风险。",
+            "在同一个目标分布上平均，得到μ̂₁和μ̂₀。",
+            "形成预设尺度的对比，并进行不确定性分析。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "equation",
+          "text": "μ̂ₐ = (1/n) Σᵢ Q̂ₐ(Wᵢ)；ψ̂_RD = (1/n) Σᵢ [Q̂₁(Wᵢ)−Q̂₀(Wᵢ)]",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "样本中每行同权平均时，目标是该样本的经验W分布。若研究另一个已定义人群，需要相应目标权重、支持范围及迁移假设。不能把样本预测的平均自动解释为所有地区或所有病人的效果。"
+        }
+      ]
+    },
+    {
+      "id": "worked",
+      "title": "三个风险层的完整计算",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "目标层",
+            "目标比例",
+            "无提醒风险Q₀",
+            "提醒风险Q₁",
+            "风险差"
+          ],
+          "rows": [
+            [
+              "低",
+              "25%",
+              "12%",
+              "8%",
+              "−4个百分点"
+            ],
+            [
+              "中",
+              "25%",
+              "24%",
+              "16%",
+              "−8个百分点"
+            ],
+            [
+              "高",
+              "50%",
+              "40%",
+              "26%",
+              "−14个百分点"
+            ]
+          ],
+          "caption": "原创合成预测，假定前述识别条件成立，仅用于算术。"
+        },
+        {
+          "type": "equation",
+          "text": "μ₀ = .25×.12+.25×.24+.50×.40 = .29；μ₁ = .25×.08+.25×.16+.50×.26 = .19",
+          "caption": ""
+        },
+        {
+          "type": "equation",
+          "text": "RD = −.10；RR = .19/.29 ≈ .6552；OR = (.19/.81)/(.29/.71) ≈ .5743",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "风险差为−10个百分点，风险比约0.655，边际优势比约0.574。它们都从两个边际风险计算，但不能把相对下降和绝对下降混写。也不能先算每个人的风险比再平均，便称其为两个平均风险之比。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "q0 <- c(.12, .24, .40)\nq1 <- c(.08, .16, .26)\ntarget_w <- c(.25, .25, .50)\nstopifnot(abs(sum(target_w)-1) < 1e-12)\nmu0 <- sum(target_w*q0)\nmu1 <- sum(target_w*q1)\nc(risk0=mu0, risk1=mu1, RD=mu1-mu0,\n  RR=mu1/mu0, OR=(mu1/(1-mu1))/(mu0/(1-mu0)))\nstopifnot(abs(mu0-.29)<1e-12, abs(mu1-.19)<1e-12)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        }
+      ]
+    },
+    {
+      "id": "nonlinear",
+      "title": "先预测再平均的顺序",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Logistic模型的预测风险是expit(η)=1/(1+exp(−η))。一般而言，非线性函数的平均不等于把平均输入放进函数。若W取0和2各一半，Q₀(W)=expit(−2+0.8W)，两个人的风险分别约0.1192和0.4013，平均约0.2603；在平均W=1处预测却约为0.2315。"
+        },
+        {
+          "type": "code",
+          "language": "Python",
+          "execution": "verified",
+          "code": "from math import exp\nexpit = lambda z: 1/(1+exp(-z))\nindividual_average = (expit(-2) + expit(-2 + .8*2))/2\nat_average = expit(-2 + .8*1)\nassert abs(individual_average-at_average) > .02\nprint(round(individual_average, 6), round(at_average, 6))",
+          "caption": "原创Python标准库计算；实际执行验证：逐人平均0.260258，平均协变量处预测0.231475。"
+        },
+        {
+          "type": "paragraph",
+          "text": "一个人的预测概率也不是其已实现的潜在0/1结果。G计算可估计平均风险，但没有承诺找出每个人在两个世界中的实际结局。对于线性恒等链接的恒定处理效应，模型系数与标准化均值差可以一致；logistic系数则应先转回风险再平均。"
+        }
+      ]
+    },
+    {
+      "id": "diagnose",
+      "title": "外推、误设和不确定性",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "支持：两组在相关W范围内都有足够观测，尤其检查极端人群。",
+            "模型：允许合理的非线性及交互，检查预测值与样本量；高AUC无法验证无未测混杂。",
+            "目标：两份预测输入来自同一目标人群，A方向和Y的事件编码一致。",
+            "推断：重抽样或解析方差需要与估计过程和抽样单位匹配，不能只报告预测差的标准差。"
+          ],
+          "ordered": false
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l05-average",
+          "prompt": "在logistic结果模型中，要估计样本人群平均风险，应优先：",
+          "options": [
+            "把所有协变量替换为其均值后预测一次",
+            "为每人保留原W，统一设A后逐人预测，再平均",
+            "直接使用A系数"
+          ],
+          "answer": 1,
+          "explanation": "非线性链接使平均输入处预测与平均预测一般不同。A系数处在log-odds尺度，也不是风险均值。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l05-assumption",
+          "prompt": "某一基线亚组从未接受A=0，但模型仍给出其无处理风险。该预测主要需要警惕：",
+          "options": [
+            "正性和模型外推",
+            "期望线性性失效",
+            "风险一定超出0至1"
+          ],
+          "answer": 0,
+          "explanation": "软件能生成数值不等于资料支持该比较。即使预测在0至1内，也可能主要由函数形式外推得到。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第3章：识别条件；第13章：Standardization and the parametric g-formula"
+    },
+    {
+      "id": "r-predict.glm",
+      "title": "R Documentation: predict.glm",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/predict.glm.html",
+      "locator": "type=\"response\"返回响应尺度预测"
+    }
+  ],
+  "exerciseIds": [
+    "w02-l05-average",
+    "w02-l05-assumption"
+  ],
+  "codeStatus": "not-run"
+}

@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "id": "w05-l01",
+  "week": 5,
+  "order": 1,
+  "title": "AIPW 与双重稳健",
+  "summary": "从结果标准化加一项加权残差出发，推导双重稳健的两个分支，用数值表检查何时抵消偏差。",
+  "status": "ready",
+  "readingMinutes": 27,
+  "tags": [
+    "AIPW",
+    "双重稳健",
+    "加权残差",
+    "误差乘积"
+  ],
+  "objectives": [
+    "解释ATE信号的三项与控制组减号。",
+    "通过条件期望证明Q正确和e正确两条一致性分支。",
+    "区分双重稳健、有限样本无偏与有效置信区间。"
+  ],
+  "prerequisites": [
+    "G计算与IPW",
+    "条件期望的全期望公式",
+    "第4周机器学习中间量"
+  ],
+  "sections": [
+    {
+      "id": "single-models",
+      "title": "两条单模型路径的限制",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "G计算用Q̂₁−Q̂₀的标准化平均估计效应。若结果函数的错误在目标人群中没有抵消，这个平均会留下偏差。IPW用ê改变观察贡献；若处理概率错误，也可能无法恢复目标分布。两者都能使用灵活学习器，但灵活性无法保证拟合一定正确。"
+        },
+        {
+          "type": "paragraph",
+          "text": "AIPW把Q与e放进一个特定的估计式。它保留每个人的标准化预测差，并用实际观察到的结局与该人的相应预测之间的残差作校正。两个模型简单相加或把两种ATE取平均，都不会自动得到以下性质。AIPW和AIPTW在这里指同一类增强逆概率加权方法。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本课仍以二元处理、完整结局、独立同分布样本和全体人群ATE为基本设定。因果解释继续依赖明确干预、一致性、条件交换性与正性。这里的估计一致性是样本量增加时估计值趋近目标；它与潜在结果框架中的处理一致性是不同概念。"
+        }
+      ]
+    },
+    {
+      "id": "signal",
+      "title": "标准化预测与两项残差",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "Hᵢ = Q̂₁(Wᵢ) − Q̂₀(Wᵢ) + Aᵢ{Yᵢ−Q̂₁(Wᵢ)}/ê(Wᵢ) − (1−Aᵢ){Yᵢ−Q̂₀(Wᵢ)}/{1−ê(Wᵢ)}"
+        },
+        {
+          "type": "equation",
+          "text": "ψ̂AIPW = (1/n)Σᵢ Hᵢ"
+        },
+        {
+          "type": "paragraph",
+          "text": "第一项给出每个人在两种状态下的预测差。第二项只对实际A=1者出现：用处理概率校正其结局残差。第三项只对实际A=0者出现，因为最终目标是处理风险减对照风险，所以对照残差带减号。未观测到的潜在结果从未被直接拿来计算。"
+        },
+        {
+          "type": "paragraph",
+          "text": "也可以先分别估计两种风险：μ̂₁=平均[Q̂₁+A(Y−Q̂₁)/ê]，μ̂₀=平均[Q̂₀+(1−A)(Y−Q̂₀)/(1−ê)]，然后相减。这样更容易检查分母和符号。把μ̂₀中的正校正误写成负校正，再相减，会得到错误的ATE。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察",
+            "A",
+            "Y",
+            "Q̂₁",
+            "Q̂₀",
+            "ê",
+            "预测差",
+            "处理校正",
+            "对照校正（已含负号）",
+            "H"
+          ],
+          "rows": [
+            [
+              "1",
+              "1",
+              "0",
+              "0.20",
+              "0.10",
+              "0.50",
+              "0.10",
+              "−0.40",
+              "0",
+              "−0.30"
+            ],
+            [
+              "2",
+              "0",
+              "0",
+              "0.40",
+              "0.20",
+              "0.25",
+              "0.20",
+              "0",
+              "+0.266667",
+              "0.466667"
+            ],
+            [
+              "3",
+              "1",
+              "1",
+              "0.60",
+              "0.40",
+              "0.75",
+              "0.20",
+              "+0.533333",
+              "0",
+              "0.733333"
+            ],
+            [
+              "4",
+              "0",
+              "1",
+              "0.80",
+              "0.50",
+              "0.50",
+              "0.30",
+              "0",
+              "−1.00",
+              "−0.70"
+            ]
+          ],
+          "caption": "独立构造的四行计算例。模型预测视为给定，表格不用于评价模型是否正确。"
+        },
+        {
+          "type": "paragraph",
+          "text": "单纯预测差平均为0.20。校正后四个H的和为0.20，平均为0.05。这种改动来自实际残差的方向和权重，不能预先保证总是更接近真值。H是估计贡献，允许超出风险差范围；某些有限样本中，AIPW风险估计自身也可能超出[0,1]。后续TMLE会讨论概率约束下的目标更新。"
+        }
+      ]
+    },
+    {
+      "id": "proof",
+      "title": "双重稳健的条件期望证明",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "用q̃₁、q̃₀、ẽ表示固定候选函数；用Q₁、Q₀、e表示真实观测分布中的函数。可以把候选看作在另一训练样本上已拟合的函数，再对一个新观察求期望。先分析处理风险信号H₁=q̃₁+A(Y−q̃₁)/ẽ。"
+        },
+        {
+          "type": "equation",
+          "text": "E[H₁ | W] = q̃₁(W) + {e(W)/ẽ(W)}{Q₁(W)−q̃₁(W)}"
+        },
+        {
+          "type": "list",
+          "items": [
+            "若q̃₁=Q₁，括号中的条件均值残差为0。只要ẽ使权重有限，条件期望为Q₁。",
+            "若ẽ=e，比例为1，q̃₁与负q̃₁抵消，条件期望仍为Q₁。此时加权残差一般不等于0；它负责纠正结果预测错误。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "paragraph",
+          "text": "对照风险同理：E[H₀|W]=q̃₀+{(1−e)/(1−ẽ)}(Q₀−q̃₀)。当两种状态的Q都正确，或者e正确时，两风险差的外层期望等于ATE。这里Q正确的分支一般需要Q₁、Q₀都正确；只有一个处理状态的结果模型正确并不够。"
+        },
+        {
+          "type": "equation",
+          "text": "E[H−ψ] = E[(ẽ−e){(q̃₁−Q₁)/ẽ + (q̃₀−Q₀)/(1−ẽ)}]",
+          "caption": "H是完整ATE信号。直接将上面两个条件期望减去Q₁、Q₀再相减，即得这一偏差恒等式。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这个表达式展示误差相乘的结构。任一整类函数正确会消除该总体偏差项；两者都有小误差时，乘积可能比单个误差更小。但是接近0或1的分母会放大误差。学习器收敛到错误极限时，偏差不会仅因模型数量增加而必然消失。"
+        }
+      ]
+    },
+    {
+      "id": "four-scenarios",
+      "title": "四种正确性设定的精确计算",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "再次使用第4周的两层总体：P(W)=各半，真实e为(0.2,0.8)，真实Q₀为(0.1,0.4)，Q₁为(0.05,0.3)。错误的结果模型取常数q̃₀=(0.25,0.25)、q̃₁=(0.20,0.20)，错误的处理模型取ẽ=(0.5,0.5)。直接对总体分布求期望，无须随机抽样。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "结果函数",
+            "处理函数",
+            "AIPW信号的总体期望",
+            "与真ATE −0.075 的关系"
+          ],
+          "rows": [
+            [
+              "正确",
+              "正确",
+              "−0.075",
+              "相同"
+            ],
+            [
+              "正确",
+              "错误",
+              "−0.075",
+              "Q分支有效"
+            ],
+            [
+              "错误",
+              "正确",
+              "−0.075",
+              "e分支有效"
+            ],
+            [
+              "错误",
+              "错误",
+              "+0.090",
+              "本例留下0.165偏差"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "p = [0.5, 0.5]\ne, q0, q1 = [0.2,0.8], [0.1,0.4], [0.05,0.3]\ndef population_aipw(f0, f1, fe):\n    h1 = [b + ps/es*(truth-b) for b,ps,es,truth in zip(f1,e,fe,q1)]\n    h0 = [a + (1-ps)/(1-es)*(truth-a) for a,ps,es,truth in zip(f0,e,fe,q0)]\n    return sum(pi*(b-a) for pi,a,b in zip(p,h0,h1))\nwrong0, wrong1, wronge = [0.25,0.25], [0.2,0.2], [0.5,0.5]\nvalues = [population_aipw(q0,q1,e), population_aipw(q0,q1,wronge),\n          population_aipw(wrong0,wrong1,e), population_aipw(wrong0,wrong1,wronge)]\nassert all(abs(x+0.075)<1e-12 for x in values[:3])\nassert abs(values[3]-0.09)<1e-12\nA,Y = [1,0,1,0], [0,0,1,1]\nf1,f0,fe = [0.2,0.4,0.6,0.8], [0.1,0.2,0.4,0.5], [0.5,0.25,0.75,0.5]\nsignal = [b-a+t*(y-b)/ps-(1-t)*(y-a)/(1-ps)\n          for t,y,b,a,ps in zip(A,Y,f1,f0,fe)]\nassert abs(sum(signal)/4-0.05)<1e-12\nprint([round(x,3) for x in values], round(sum(signal)/4,3))",
+          "execution": "verified",
+          "caption": "已执行：四种总体期望依次为−0.075、−0.075、−0.075、0.09；四行样本信号均值为0.05。没有模拟拟合或重复抽样。"
+        },
+        {
+          "type": "paragraph",
+          "text": "表中前三格相同是对固定函数的总体恒等式。真实分析要从样本估计这些函数，存在拟合误差、正则化与同样本依赖。因此应把结论表述为相应条件下的一致性，而不能从表格推出每次有限样本都恰好得到−0.075。两模型都错时也可能偶然抵消偏差；这种偶然性无法作为分析保证。"
+        }
+      ]
+    },
+    {
+      "id": "inference-limits",
+      "title": "一致性、效率与区间各有条件",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "当两类函数都估得足够好，AIPW可具有与相应模型有效影响函数相联系的渐近性质。学习器足够灵活、交叉拟合、权重稳定和适当误差收敛率共同决定能否得到可靠的一阶近似。单凭一个模型正确，并不能自动保证常见影响函数标准误在所有自适应设定下都有效。"
+        },
+        {
+          "type": "paragraph",
+          "text": "交叉拟合使每个人的Q̂和ê来自不含该人的训练资料，缓解同样本拟合与评价造成的过拟合依赖。它不消除未测混杂，不保证候选库包含真函数，也不保证概率远离边界。一次K折中，每个人由对应的一个外层训练集预测；随后拼接全部人的信号。反复随机分折属于另外的重复步骤。"
+        },
+        {
+          "type": "callout",
+          "title": "固定截断改变函数正确性分支",
+          "text": "若真实e=0.01而分析始终把ê截为至少0.025，截断后的函数不会收敛到原e。此时不能无条件使用e正确的分支；若Q仍正确，另一分支在适当条件下可能保留。需要报告截断比例、影响程度和敏感性。",
+          "tone": "warning"
+        },
+        {
+          "type": "paragraph",
+          "text": "双重稳健主要缓解辅助函数错设风险，不替代研究设计。AIPW也会受到极端逆概率影响，不宜普遍宣称它比IPW或TMLE更稳定、更有效。下一课把正交性写成得分的局部数学性质，并说明PLR残差回归与IRM-ATE的区别。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "练习与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w05-l01-ex1",
+          "prompt": "在结果plug-in加加权残差的分解中，如果e正确而Q错误，加权残差的总体均值通常应当",
+          "options": [
+            "必然为0",
+            "抵消Q标准化平均中的相应偏差",
+            "等于估计量的标准误",
+            "等于未测混杂大小"
+          ],
+          "answer": 1,
+          "explanation": "当e正确时，E[A(Y−q̃₁)/e|W]=Q₁−q̃₁；该项一般非零，作用是纠正q̃₁的误差。只有Q正确时，这种分解中的条件平均残差才为零。对照分支也需保留正确符号。"
+        },
+        {
+          "type": "exercise",
+          "id": "w05-l01-ex2",
+          "prompt": "Q₁正确、Q₀错误且e错误时，对ATE最恰当的判断是",
+          "options": [
+            "完整Q分支已经满足，必然一致",
+            "只要使用五折就必然无偏",
+            "双重稳健的通常充分条件尚未满足",
+            "应把控制组残差项删除"
+          ],
+          "answer": 2,
+          "explanation": "ATE需要两种潜在风险。Q正确的充分分支通常要求Q₁和Q₀均正确；另一分支要求e正确。这里只有一个状态的Q正确，偏差公式中的其他误差项仍可能不为零。偶然抵消不等于一般保证。"
+        },
+        {
+          "type": "exercise",
+          "id": "w05-l01-ex3",
+          "prompt": "一次有限样本AIPW计算得到某人的H=1.4，Y为二元结局。首先应当",
+          "options": [
+            "将H强行截到1再平均",
+            "区分估计信号与事件概率，并检查公式和权重",
+            "将此人删除",
+            "认定代码一定错误"
+          ],
+          "answer": 1,
+          "explanation": "H含逆概率加权残差，允许超出[−1,1]。先核对符号、概率、异常权重与数据；不能仅因信号越界就随意截断或删除，否则改变估计式。AIPW风险估计本身在小样本中也可能越界，应审慎报告。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "bang-robins",
+      "title": "Doubly Robust Estimation in Missing Data and Causal Inference Models",
+      "authors": "Heejung Bang; James M. Robins",
+      "year": 2005,
+      "url": "https://doi.org/10.1111/j.1541-0420.2005.00377.x",
+      "locator": "Biometrics 61: double robustness and causal inference models"
+    },
+    {
+      "id": "what-if",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "Chapters 2–3, 12–13: exchangeability, positivity, IP weighting and standardization"
+    },
+    {
+      "id": "dml-paper",
+      "title": "Double/Debiased Machine Learning for Treatment and Structural Parameters",
+      "authors": "Victor Chernozhukov; Denis Chetverikov; Mert Demirer; Esther Duflo; Christian Hansen; Whitney Newey; James Robins",
+      "year": 2018,
+      "url": "https://doi.org/10.1111/ectj.12097",
+      "locator": "Published in The Econometrics Journal 21: C1–C68; Sections 2–3, 4.1 and 5.1"
+    }
+  ],
+  "exerciseIds": [
+    "w05-l01-ex1",
+    "w05-l01-ex2",
+    "w05-l01-ex3"
+  ],
+  "codeStatus": "verified"
+}

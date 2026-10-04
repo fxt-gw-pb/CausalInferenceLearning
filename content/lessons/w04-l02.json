@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "id": "w04-l02",
+  "week": 4,
+  "order": 2,
+  "title": "学习器与 Super Learner",
+  "summary": "从不同学习器的归纳偏好到折外预测矩阵，手算一个有约束的集成，并辨认交叉验证的评价边界。",
+  "status": "ready",
+  "readingMinutes": 25,
+  "tags": [
+    "监督学习",
+    "样本外预测",
+    "交叉验证",
+    "Super Learner"
+  ],
+  "objectives": [
+    "按估计目标选择概率或条件均值输出。",
+    "从折外预测计算风险并求凸组合权重。",
+    "区分候选学习器风险、组合训练风险和组合的独立评价。"
+  ],
+  "prerequisites": [
+    "均值、方差与平方损失",
+    "训练集与验证集",
+    "Q 与 e 的定义"
+  ],
+  "sections": [
+    {
+      "id": "learner-map",
+      "title": "学习器的目标与结构",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "监督学习用有标签的样本学习输入与响应之间的关系；无监督学习可用于聚类、降维或探索结构。因果分析中的 Q 和 e 通常属于监督任务。聚类发现的人群相似性可帮助探索，但一个聚类标签并不能自动使给定它后的处理选择满足交换性。"
+        },
+        {
+          "type": "paragraph",
+          "text": "回归与分类描述预测目标，线性模型、树和神经网络描述函数结构。二元结局也可以用条件均值的语言讲解：Qₐ(W) 等于发生事件的概率。倾向得分需要同样的概率输出，即便软件将该任务称为分类。选择模型时同时检查响应类型、输出尺度和所用损失。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "方法族",
+            "表达结构的方式",
+            "值得保留的特点",
+            "常见风险"
+          ],
+          "rows": [
+            [
+              "线性/广义线性模型",
+              "基函数、主效应、交互与链接函数",
+              "简单且可诊断，可加入样条表达非线性",
+              "默认主效应不足以表达复杂关系"
+            ],
+            [
+              "岭回归/LASSO/弹性网",
+              "对系数施加不同惩罚",
+              "高维下约束复杂度",
+              "收缩会带来估计偏差；变量选择不等同混杂选择"
+            ],
+            [
+              "单树与随机森林",
+              "递归分区；随机化后汇总多棵树",
+              "可表达交互与阈值",
+              "单树不稳定，过小叶节点可能输出极端概率"
+            ],
+            [
+              "梯度提升",
+              "按损失的负梯度逐步增加模型",
+              "能逐步补充尚未拟合的结构",
+              "树深、学习率与迭代数共同影响过拟合"
+            ],
+            [
+              "SVM、神经网络、近邻",
+              "间隔/核、分层映射、局部距离",
+              "提供不同函数表示",
+              "概率校准、样本量、距离缩放与维数均需检查"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "随机森林的树可以并行训练，但它们共享原始样本，预测并非统计独立。bagging通过重抽样和平均改善稳定性；boosting按顺序改进指定损失，一般损失下拟合的是伪残差。使用这些直觉时仍要看具体配置。LightGBM、XGBoost等是算法与工程实现，不宜用算法名称的相加来代替其定义。"
+        }
+      ]
+    },
+    {
+      "id": "loss-and-risk",
+      "title": "损失函数与样本外风险",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "平方损失 L(y,p) = (y−p)²；二元对数损失 L(y,p) = −y log p − (1−y) log(1−p)"
+        },
+        {
+          "type": "paragraph",
+          "text": "对一个已经训练好的预测器 f，风险是它在新的同分布观察上的平均损失。训练误差只说明对已见样本的拟合。模型复杂时，两者可以相差很大。对数损失会严厉惩罚对错误结果给出接近确定的概率；二元平方损失常称 Brier 分数。AUC只比较正负例的排序，不直接衡量概率是否校准。"
+        },
+        {
+          "type": "equation",
+          "text": "R̂ⱼ,CV = (1/n) Σᵢ L(Yᵢ, f̂ⱼ,−v(i)(Xᵢ))",
+          "caption": "v(i) 是第 i 人所属的验证折；−v(i) 表示训练时排除该折。这里 X 表示当前预测任务的全部输入。"
+        },
+        {
+          "type": "paragraph",
+          "text": "将 n 个独立观察分成 V 折。每次留下一折，用其余折训练每个候选，再预测被留下的人。每个人最终得到每个候选的一次折外预测。形成 n×J 矩阵 Z，J 是候选数。每一列的风险可在相同的行、相同的损失下比较。"
+        },
+        {
+          "type": "callout",
+          "title": "划分单位服从抽样结构",
+          "text": "同一患者的重复记录、同一家医院的强相关记录，不能随意拆到训练与验证两边来模仿独立新样本。时间预测也应按实际部署时序设计。折分方案必须匹配研究目的。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "ensemble",
+      "title": "从折外预测到集成",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "SL先建立具有合理差异的候选库，再从折外预测学习怎样组合它们。一种清楚的教学版本使用非负、和为 1 的权重。二元任务中，若所有候选都输出合法概率，这种凸组合也位于 0 到 1 之间。不同软件元学习方法的约束可能不同，应读取具体设置。"
+        },
+        {
+          "type": "equation",
+          "text": "α̂ = argminα (1/n) Σᵢ L(Yᵢ, Σⱼ αⱼ Zᵢⱼ)，约束 αⱼ ≥ 0，Σⱼ αⱼ = 1"
+        },
+        {
+          "type": "list",
+          "items": [
+            "预先给出候选库、预处理、调参范围、损失和折分规则。",
+            "在每个训练折内完成需要学习的数据变换及调参，再生成折外 Z。",
+            "在 Z 上优化组合权重。权重由全部候选预测的联合结构决定。",
+            "使用全部训练资料重新拟合每个候选，并固定已学得权重，为未来输入产生最终组合预测。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "paragraph",
+          "text": "候选库最好包含简单基线、合理的参数模型与不同的灵活模型。十个几乎相同的模型不一定比三个有互补结构的模型更有帮助。某个候选单独风险略高，仍可能在另一个候选预测不好的区域补足信息。因此，不能把各候选风险的倒数机械地当作SL权重。"
+        },
+        {
+          "type": "paragraph",
+          "text": "Super Learner 的原始论文讨论交叉验证驱动集成的预测性质。oracle型结论的比较对象、损失、候选库规模和统计条件都有限定。它支持有条件的渐近预测风险论证，不保证每份有限样本上都胜过库内最佳者，更不保证因果效应无偏或识别成功。"
+        }
+      ]
+    },
+    {
+      "id": "worked-ensemble",
+      "title": "四行折外预测的手算",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "假设两个候选在同一组验证折上产生以下预测。数值是专门构造的，目的是分离组合优化与复杂模型拟合。用 α 表示候选甲的权重，乙的权重为 1−α。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察",
+            "Y",
+            "候选甲 Z甲",
+            "候选乙 Z乙"
+          ],
+          "rows": [
+            [
+              "1",
+              "0",
+              "0.10",
+              "0.30"
+            ],
+            [
+              "2",
+              "0",
+              "0.40",
+              "0.20"
+            ],
+            [
+              "3",
+              "1",
+              "0.60",
+              "0.80"
+            ],
+            [
+              "4",
+              "1",
+              "0.90",
+              "0.70"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "甲的平方风险为 0.085，乙为 0.065。令 d=Z甲−Z乙，组合预测为 Z乙+αd。对平方损失求导，可得未约束最优值 α=Σdᵢ(Yᵢ−Z乙,ᵢ)/Σdᵢ²=0.04/0.16=0.25；该值已位于 [0,1]，无须投影到端点。组合预测为 0.25、0.25、0.75、0.75，损失为 0.0625。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "y = [0, 0, 1, 1]\na = [0.1, 0.4, 0.6, 0.9]\nb = [0.3, 0.2, 0.8, 0.7]\ndef mse(pred):\n    return sum((yi-pi)**2 for yi, pi in zip(y, pred))/len(y)\nd = [ai-bi for ai, bi in zip(a, b)]\nalpha = sum(di*(yi-bi) for di, yi, bi in zip(d, y, b))/sum(di**2 for di in d)\nalpha = min(1.0, max(0.0, alpha))\npred = [alpha*ai+(1-alpha)*bi for ai, bi in zip(a,b)]\nassert abs(alpha-0.25) < 1e-12\nassert abs(mse(pred)-0.0625) < 1e-12\nprint(round(mse(a),4), round(mse(b),4), round(alpha,4), round(mse(pred),4))",
+          "execution": "verified",
+          "caption": "已执行：输出 0.085、0.065、0.25、0.0625。这里只核验原创预测表的代数，没有训练真实学习器。"
+        },
+        {
+          "type": "paragraph",
+          "text": "0.0625是在同一组 Z 和 Y 上选出权重后的损失。虽然每列 Z 是折外预测，组合权重已经看过这四个 Y；所以该值仍不能充当最终组合器的完全独立测试风险。若要评价SL整体，可以在更外层验证集上运行完整SL训练流程，或使用独立测试集。候选的折外风险、组合优化值、最终组合的泛化风险是三个不同对象。"
+        }
+      ]
+    },
+    {
+      "id": "causal-integration",
+      "title": "从预测集成连接到因果估计",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "拟合结果模型时，SL输入是 A 与适当 W，响应是 Y；拟合处理模型时，输入是 W，响应是 A。二者可以使用不同候选库。结果模型的损失关注结局预测，处理模型的损失关注处理概率，但因果分析还必须检查平衡、支持集与极端逆概率。"
+        },
+        {
+          "type": "paragraph",
+          "text": "SL内部交叉验证选择预测器。第五周的外层交叉拟合则要求某个人进入因果得分时，他的 Q̂、ê 由不含该人的训练样本得到。若训练样本内部使用SL，还会有一层SL交叉验证。仅在全样本调用一次SL再对同一人群预测，不能自动取得这种外层分离。"
+        },
+        {
+          "type": "callout",
+          "title": "共享错设仍然可能存在",
+          "text": "如果所有候选都遗漏同一个必要的非线性，或者全部用了错误的调整集，集成未必改善目标估计。库内比较不能判断是否缺少真正重要的信息。概率模型正确性也要与未测混杂区分开。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "练习与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w04-l02-ex1",
+          "prompt": "在四行预测表中，只按单独风险最小原则选择乙，会得到 0.065。SL还给甲 0.25 权重的直接原因是",
+          "options": [
+            "甲一定更接近真实因果机制",
+            "两者误差存在可利用的互补性",
+            "SL必须给每个候选正权重",
+            "权重等于风险的倒数"
+          ],
+          "answer": 1,
+          "explanation": "甲在第1和4行更准确，乙在第2和3行更准确。联合优化可以平衡这些误差。权重由整个预测矩阵决定，可能为零，也没有因果机制含义。此例的最优凸组合风险为0.0625。"
+        },
+        {
+          "type": "exercise",
+          "id": "w04-l02-ex2",
+          "prompt": "某分析在全样本运行一次SL，然后用全样本重拟合的Q与e为每个人计算AIPW。已完成的操作是",
+          "options": [
+            "SL的内部模型选择；尚不能据此宣称AIPW外层交叉拟合",
+            "全部因果得分必然折外",
+            "正性和交换性均已验证",
+            "每个人恰好获得五个独立因果估计"
+          ],
+          "answer": 0,
+          "explanation": "SL用于学习候选权重的内部折分与最终因果得分的训练/评价分离是两层任务。全样本重拟合候选通常包含了待评价者。需要外层留出该人的数据，再在外层训练集内完整训练SL。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "sl-paper",
+      "title": "Super learner",
+      "authors": "Mark J. van der Laan; Eric C. Polley; Alan E. Hubbard",
+      "year": 2007,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/17910531/",
+      "locator": "Original article, DOI 10.2202/1544-6115.1309: cross-validated ensemble prediction"
+    },
+    {
+      "id": "sl-manual",
+      "title": "SuperLearner: Super Learner Prediction",
+      "authors": "SuperLearner package authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://cran.r-project.org/web/packages/SuperLearner/SuperLearner.pdf",
+      "locator": "SuperLearner, CV.SuperLearner, SuperLearner.CV.control and prediction methods"
+    },
+    {
+      "id": "dml-paper",
+      "title": "Double/Debiased Machine Learning for Treatment and Structural Parameters",
+      "authors": "Victor Chernozhukov; Denis Chetverikov; Mert Demirer; Esther Duflo; Christian Hansen; Whitney Newey; James Robins",
+      "year": 2018,
+      "url": "https://doi.org/10.1111/ectj.12097",
+      "locator": "Published in The Econometrics Journal 21: C1–C68; Sections 2–3, 4.1 and 5.1"
+    }
+  ],
+  "exerciseIds": [
+    "w04-l02-ex1",
+    "w04-l02-ex2"
+  ],
+  "codeStatus": "verified"
+}

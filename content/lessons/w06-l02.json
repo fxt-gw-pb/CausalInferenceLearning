@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "id": "w06-l02",
+  "week": 6,
+  "order": 2,
+  "title": "TMLE 的 R 实现",
+  "summary": "在原创模拟数据中说明 tmle 的输入和输出；用累计发生率及协方差计算风险差、风险比和优势比。",
+  "status": "ready",
+  "readingMinutes": 26,
+  "tags": [
+    "目标量",
+    "更新",
+    "累计风险",
+    "不确定性"
+  ],
+  "objectives": [
+    "固定 A、Y、W 与边际目标",
+    "读懂 tmle 输出中的估计值和方差",
+    "正确解释累计发生率与竞争风险",
+    "为派生效应量保留两个风险估计之间的协方差"
+  ],
+  "prerequisites": [
+    "w06-l01",
+    "R 数据框与模型公式；Delta 法"
+  ],
+  "sections": [
+    {
+      "id": "specification",
+      "title": "从研究规格到数据结构",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "本节使用完全模拟的记录。A 为基线二元干预，Y 为统一随访期限内是否发生事件，W1、W2 为干预前协变量。目标总体为模拟总体，报告总体风险差 ATE。ATT 与 ATC 分别对实际处理者和实际对照者的协变量分布平均；三者不应在同一列中充当重复验证。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "对象",
+            "数据要求",
+            "主要检查"
+          ],
+          "rows": [
+            [
+              "A",
+              "长度为 n 的 0/1 向量",
+              "处理方向；两组是否均有观测"
+            ],
+            [
+              "Y",
+              "长度为 n 的 0/1 向量",
+              "事件方向；随访窗口；缺失"
+            ],
+            [
+              "W",
+              "n 行的基线协变量表",
+              "变量时序；类型；无识别码"
+            ],
+            [
+              "Q 与 g 库",
+              "与结果类型匹配的学习器",
+              "依赖已安装；预测范围与失败记录"
+            ]
+          ]
+        },
+        {
+          "type": "callout",
+          "title": "运行状态",
+          "text": "下列 R 代码为独立重写的代码讲解，当前环境未运行 R，也未验证包之间的完整运行兼容性。不要把预计结果当作执行日志。Python 的协方差算术示例单独执行核验。",
+          "tone": "note"
+        }
+      ]
+    },
+    {
+      "id": "r-example",
+      "title": "二元结果的独立 R 示例",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 需要预先配置 tmle 和 SuperLearner；本段不自动安装包。\nstopifnot(requireNamespace(\"tmle\", quietly=TRUE))\nset.seed(606)\nn <- 1600L\nW1 <- rnorm(n)\nW2 <- rbinom(n, 1, 0.4)\ne <- plogis(-0.2 + 0.5*W1 - 0.3*W2)\nA <- rbinom(n, 1, e)\nevent_p <- plogis(-1.2 - 0.4*A + 0.6*W1 + 0.3*W2)\nY <- rbinom(n, 1, event_p)\nW <- data.frame(W1=W1, W2=W2)\nstopifnot(all(A %in% 0:1), all(Y %in% 0:1), !anyNA(W))\nfit <- tmle::tmle(Y=Y, A=A, W=W, family=\"binomial\",\n    Q.SL.library=c(\"SL.mean\", \"SL.glm\"),\n    g.SL.library=c(\"SL.mean\", \"SL.glm\"), cvQinit=TRUE)\nate <- fit$estimates$ATE\nstopifnot(is.finite(ate$psi), is.finite(ate$var.psi), ate$var.psi>=0)\nc(estimate=ate$psi, se=sqrt(ate$var.psi))\nate$CI\npackageVersion(\"tmle\")\nsessionInfo()",
+          "execution": "not-run",
+          "caption": "原创模拟；binary Y 使用 binomial。R 未执行，未给出拟合输出。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这段数据生成机制中 A 依赖 W，因此总体的两组粗风险差一般受到混杂影响。结果风险通过 logistic 函数构造；−0.4 是条件 log odds 系数，不能把它当作总体风险差真值。若需核对真值，可对很大的独立模拟 W 样本计算 Q₁(W)−Q₀(W) 的平均，并报告 Monte Carlo 误差。"
+        },
+        {
+          "type": "paragraph",
+          "text": "先检查 estimates 的实际结构，再按名字提取目标。var.psi 是估计量方差，标准误为其平方根。cvQinit 的含义以所用版本手册为准，本段只明确启用交叉验证初始结果预测，未据此宣称完成了所有 nuisance 与 targeting 的交叉拟合。完整复现实验还应保存包版本、种子、数据生成代码、g 的范围、截断策略及失败信息。"
+        }
+      ]
+    },
+    {
+      "id": "scale",
+      "title": "风险与效应尺度",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "pₐ=E[Y(a)]；RD=p₁−p₀；RR=p₁/p₀；OR={p₁/(1−p₁)}/{p₀/(1−p₀)}。"
+        },
+        {
+          "type": "paragraph",
+          "text": "设一个独立构造例子的 p₀=0.30、p₁=0.24。RD=−0.06，表示事件风险少 6 个百分点；RR=0.80，表示相对风险低 20%；OR≈0.7368，表示事件优势比。三者表达同一对边际风险的不同尺度，数值之间不能直接比较大小来评判模型。"
+        },
+        {
+          "type": "paragraph",
+          "text": "二元结果不意味着分析只可报告 OR。边际风险经过标准化可以产生 RD、RR 和 OR。反过来，logistic 回归中的 A 系数通常是条件 log OR，其指数化并不自动得到这两个边际风险计算出的 OR。"
+        }
+      ]
+    },
+    {
+      "id": "survival",
+      "title": "生存与累计发生率",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "Fₐ,k(t)=P(T≤t,J=k∣do(A=a))；Sₐ(t)=1−ΣₖFₐ,k(t)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "T 是首次事件时间，J 是事件类型。survtmle 的 est 对应指定处理与事件类型下的边际累计发生率，var 提供其协方差。读输出时要通过标签确认处理和事件类型的排列，不能靠第一个元素的位置猜测组别。"
+        },
+        {
+          "type": "paragraph",
+          "text": "只有单一事件时，F₀(t)=0.30、F₁(t)=0.24 对应 S₀(t)=0.70、S₁(t)=0.76。事件风险差为 −0.06，生存概率差为 +0.06。若另有竞争事件，1−Fₐ,1(t) 还包括已发生竞争事件的人，不再等于未发生任何事件的概率。将竞争事件简单删失，也不能在未说明识别条件和目标的情况下解释为现实世界原因别风险。"
+        },
+        {
+          "type": "paragraph",
+          "text": "基线处理、基线 W 和右删失的示例，与时变处理 A(t)、时变混杂 L(t) 的纵向分析有不同数据结构。后一类需要逐时点的处理/删失正性与序贯交换性，以及相应递归算法。只向基线接口传入随访时间，不能自动控制处理后时变混杂。"
+        }
+      ]
+    },
+    {
+      "id": "survival-code",
+      "title": "累计发生率的 R 接口讲解",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 完全独立的离散时间单终点模拟；R 未执行。\nstopifnot(requireNamespace(\"survtmle\",quietly=TRUE))\nset.seed(607)\nns <- 1400L\nW1s <- rnorm(ns)\nAs <- rbinom(ns,1,plogis(0.3*W1s))\nTs <- rgeom(ns,prob=plogis(-3-0.3*As+0.4*W1s))+1L\nCs <- rgeom(ns,prob=0.025)+1L\nftime <- as.integer(pmin(Ts,Cs,30L))\n# 离散时间并列时，本模拟规定事件先于删失被记录。\nftype <- as.integer(Ts<=Cs & Ts<=30L)\nsf <- survtmle::survtmle(ftime=ftime,ftype=ftype,trt=As,\n    adjustVars=data.frame(W1=W1s),t0=20L,method=\"hazard\",\n    glm.trt=\"W1\",glm.ftime=\"trt+W1+t\",glm.ctime=\"trt+W1\",\n    ftypeOfInterest=1L,trtOfInterest=c(0,1),\n    returnIC=TRUE,returnModels=TRUE)\nsf$est        # 指定处理及事件类型的累计发生率\nsf$var        # 必须和 est 标签共同核对的协方差矩阵\nsf$meanIC     # 靶向方程残差的诊断之一\ndimnames(sf$var)",
+          "execution": "not-run",
+          "caption": "R 未执行；无处理后协变量，也未估计动态治疗策略。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例在给定基线后按独立机制生成删失，t0=20 早于统一行政结束时间 30。ftime 是观察到的整数时间，ftype=0 标记右删失，1 标记事件。hazard 方法可能在有限样本未收敛，需检查警告与靶向残差。使用估计值前先核对标签、收敛及删失支持，再将累计发生率转换成所需效应尺度。"
+        }
+      ]
+    },
+    {
+      "id": "delta",
+      "title": "联合协方差与 Delta 法",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "继续使用 p=(p₀,p₁)=(0.30,0.24)。假设估计协方差矩阵 Σ 的对角线为 0.0009、0.000625，非对角线为 0.0003。它表示同一批资料中两项边际风险估计的联合不确定性；下面的数字是教学设定。"
+        },
+        {
+          "type": "equation",
+          "text": "∇RD=(−1,1)；∇log RR=(−1/p₀,1/p₁)；∇log OR=(−1/[p₀(1−p₀)],1/[p₁(1−p₁)])。"
+        },
+        {
+          "type": "equation",
+          "text": "Var{h(p̂)}≈∇h(p̂)ᵀΣ̂∇h(p̂)。",
+          "caption": "对 RR/OR 先在 log 尺度构造区间，最后指数变换。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "from math import sqrt, log, exp\np0,p1=0.30,0.24\nV=((0.0009,0.0003),(0.0003,0.000625))\ndef variance(g):\n    return sum(g[i]*V[i][j]*g[j] for i in range(2) for j in range(2))\nrd=p1-p0\nse_rd=sqrt(variance((-1,1)))\nrr=p1/p0\nse_log_rr=sqrt(variance((-1/p0,1/p1)))\nodds_ratio=(p1/(1-p1))/(p0/(1-p0))\nse_log_or=sqrt(variance((-1/(p0*(1-p0)),1/(p1*(1-p1)))))\nprint(\"RD, SE:\",rd,se_rd)\nprint(\"RR interval:\",*[exp(log(rr)+z*se_log_rr) for z in (-1.96,1.96)])\nprint(\"OR, log-SE:\",odds_ratio,se_log_or)\nassert abs(se_rd-sqrt(0.000925))<1e-12\nassert abs(rr-0.8)<1e-12",
+          "execution": "verified",
+          "caption": "原创、已执行的 Delta 法算术核验；没有估计真实数据的协方差。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例 RD 的标准误约为 0.03041。忽略协方差会将其改为 sqrt(0.0009+0.000625)≈0.03905。协方差也可能为负，因此忽略它的影响方向没有通用结论。风险接近 0 或 1、样本信息薄弱时，线性近似可能不可靠，应使用适合该估计器和边界情形的推断。"
+        }
+      ]
+    },
+    {
+      "id": "checks",
+      "title": "结果报告与自测",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "明确干预、事件、时间点、目标人群、尺度及调整集。",
+            "保存拟合收敛、概率分布、截断阈值与敏感性结果；不以单个 p 值确认因果。",
+            "比较方法时使用同一目标与同一信息集；区别点估计接近和推断经过验证。"
+          ]
+        },
+        {
+          "type": "exercise",
+          "id": "w06-l02-survival",
+          "prompt": "只有一种终点事件，处理组累计发生率为 0.18，对照组为 0.25。处理减对照的生存差为多少？",
+          "options": [
+            "−0.07",
+            "+0.07",
+            "0.72"
+          ],
+          "answer": 1,
+          "explanation": "S₁−S₀=(1−0.18)−(1−0.25)=0.07。事件风险差方向相反。0.72 是风险比 0.18/0.25，不能作为差解释。"
+        },
+        {
+          "type": "exercise",
+          "id": "w06-l02-covariance",
+          "prompt": "从同一批人标准化得到 p̂₀、p̂₁ 后计算 OR 的区间，需要保留哪项信息？",
+          "options": [
+            "只保留两个点估计",
+            "两个风险方差及其协方差",
+            "只保留处理组样本量"
+          ],
+          "answer": 1,
+          "explanation": "log OR 的梯度同时依赖两个风险，因此 Delta 方差包括两项方差与交叉协方差项。只保存分别的区间通常不足以恢复正确的联合推断。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "tmle",
+      "title": "tmle: An R Package for Targeted Maximum Likelihood Estimation",
+      "authors": "Susan Gruber; Mark J. van der Laan",
+      "year": 2012,
+      "url": "https://www.jstatsoft.org/article/view/v051i13",
+      "locator": "单时点处理、更新算法、效应尺度与输出"
+    },
+    {
+      "id": "tmle-manual",
+      "title": "tmle reference manual",
+      "authors": "tmle package authors",
+      "year": "在线手册",
+      "url": "https://cran.r-project.org/web/packages/tmle/tmle.pdf",
+      "locator": "tmle: family, Q.SL.library, g.SL.library, cvQinit, estimates"
+    },
+    {
+      "id": "survtmle",
+      "title": "survtmle: targeted estimation of cumulative incidence",
+      "authors": "David Benkeser; Nima S. Hejazi; survtmle contributors",
+      "year": "在线文档",
+      "url": "https://benkeser.github.io/survtmle/reference/survtmle.html",
+      "locator": "Arguments: ftime/ftype; Value: est/var"
+    }
+  ],
+  "exerciseIds": [
+    "w06-l02-survival",
+    "w06-l02-covariance"
+  ],
+  "codeStatus": "not-run"
+}

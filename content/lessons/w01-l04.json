@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "id": "w01-l04",
+  "week": 1,
+  "order": 4,
+  "title": "R 语言与工作环境",
+  "summary": "建立可重复运行的R工作习惯：脚本、对象、函数、包、帮助与错误信息各有清楚的位置。",
+  "status": "ready",
+  "readingMinutes": 16,
+  "tags": [
+    "R 与 RStudio",
+    "对象",
+    "函数"
+  ],
+  "objectives": [
+    "解释R运行时和RStudio界面的分工。",
+    "从脚本创建对象并区分赋值、比较和打印。",
+    "用帮助及返回对象判断一次操作是否符合预期。"
+  ],
+  "prerequisites": [
+    "无需编程基础"
+  ],
+  "sections": [
+    {
+      "id": "workspace",
+      "title": "R负责计算，界面帮助组织工作",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "R是计算语言和运行环境；RStudio是支持编辑、执行和查看结果的工作界面。先确认可用的R，再按自己操作系统选择合适的界面。软件下载应使用R Project/CRAN及Posit的官方入口；安装界面、系统要求与版本会更新，所以不必照着某张旧截图逐像素操作。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "区域或文件",
+            "主要用途",
+            "不应混淆的对象"
+          ],
+          "rows": [
+            [
+              "脚本编辑区与.R文件",
+              "保存可重复执行的命令",
+              "保存脚本不等于已经执行"
+            ],
+            [
+              "Console控制台",
+              "执行表达式并显示输出或错误",
+              "控制台历史不等于完整分析方案"
+            ],
+            [
+              "Environment对象区",
+              "查看当前会话已有对象",
+              "对象存在不证明刚才的命令成功更新它"
+            ],
+            [
+              "Files与工作目录",
+              "浏览文件及解析相对路径",
+              "浏览目录与改变工作目录可能是不同操作"
+            ],
+            [
+              "Help与Plots",
+              "阅读帮助、查看图形",
+              "没有画图时Plots为空是正常状态"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "建议新建一个专用项目目录，保存脚本与将来生成的结果。每次练习都能从脚本开头运行到结尾，比依赖上一次会话里恰好存在的对象更可靠。清空整个工作区不是必要的入门动作；更安全的习惯是明确创建本练习需要的对象。"
+        }
+      ]
+    },
+    {
+      "id": "objects",
+      "title": "从一条表达式读懂输入和输出",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 每行都是原创的小练习；# 后面是说明\n2 + 3\nrisk <- 30 / 200\nrisk\nrisk == 0.15\nlog_value <- log(8)\nlog_base2 <- log2(8)\nseq(from = 2, to = 10, by = 2)\nstopifnot(risk == 0.15, log_base2 == 3)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "第一行算式直接返回5。risk <- 30/200把结果存入名为risk的对象，单独输入risk才会显示其值。risk == 0.15则进行相等比较并返回TRUE。此处统一使用<-赋值，让赋值与==比较在视觉上分开；R在许多情境也允许=赋值，不能把一次无效表达式概括成=永远不能用。"
+        },
+        {
+          "type": "paragraph",
+          "text": "R区分大小写，risk与Risk是两个名字。字符串要放在配对的直引号中；对象名则用来查找已有值。运行时应选择完整表达式，多行函数调用可能要包含数行。Console出现续行提示时，先检查括号或引号是否闭合。"
+        }
+      ]
+    },
+    {
+      "id": "functions",
+      "title": "函数参数与帮助",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "函数调用可以按函数名、参数、返回值三部分阅读。seq(from=2,to=10,by=2)的from、to和by说明从哪里开始、到哪里结束、步长是多少。显式命名参数有利于学习和维护，也能减少记错参数顺序的风险。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "help(\"seq\")\nargs(seq.default)\nx <- c(2, 4, 6)\naverage <- mean(x)\nclass(x)\nlength(x)\nsessionInfo()",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "帮助页通常先给Usage，再解释Arguments、返回值和Examples。遇到陌生函数时，先确认来自哪个包、输入应是什么对象，再看例子。sessionInfo()记录当前R、平台和附加包版本，是复现报告的一部分。"
+        }
+      ]
+    },
+    {
+      "id": "packages",
+      "title": "包的安装和函数访问",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "安装包把代码放入本机的库目录；library()将一个已安装包附加到当前会话；包名::函数名可明确使用哪个包的函数。这些动作不同。新会话可能需要重新附加包，但通常不需要每次重新安装。下面仅演示R自带stats包的命名空间访问，不会安装或下载软件。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "values <- c(1, 2, 3, 4)\nstats::median(values)\nfind(\"median\")\ngetRversion()",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "callout",
+          "title": "Rtools的用途",
+          "text": "Rtools是Windows下从源代码构建R或R包的工具链。是否需要它取决于平台和安装方式，并需要匹配R版本。macOS用户不应照搬Windows的Rtools步骤。",
+          "tone": "note"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "title": "读懂错误、警告和旧对象",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Error通常使当前表达式不能正常完成；Warning表示需要检查的问题，计算可能继续。警告可能涉及版本差异，也可能涉及模型不收敛、缺失值或不合理运算。应读完整信息并检查返回对象，不能把警告统一视为成功凭证。"
+        },
+        {
+          "type": "paragraph",
+          "text": "假设old_result已经存在，随后一条给old_result重新赋值的命令报错，旧对象可能仍留在环境中。只看到对象名便继续分析，容易把旧结果当成新结果。可以用新的对象名调试，并核对长度、类型、样本数和关键值。"
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l04-warning",
+          "prompt": "模型返回了对象，同时提示未收敛。下一步最合适的是：",
+          "options": [
+            "忽略警告，因为对象已经生成",
+            "检查警告、模型诊断和数据，再判断结果是否可用",
+            "只重新打印系数"
+          ],
+          "answer": 1,
+          "explanation": "对象生成只说明某种结果被返回。未收敛可能影响估计与推断，需要检查原因；重新打印不会改善模型。"
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l04-state",
+          "prompt": "保存了analysis.R，但还没有运行其中赋值语句。Environment里没有新对象，说明：",
+          "options": [
+            "脚本保存失败",
+            "保存和执行是两个步骤，尚未创建对象",
+            "必须先安装一个统计包"
+          ],
+          "answer": 1,
+          "explanation": "脚本文件保存命令文本。对象要在代码执行后才出现在当前会话中。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-cran",
+      "title": "The Comprehensive R Archive Network",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://cran.r-project.org/",
+      "locator": "按操作系统选择官方下载入口"
+    },
+    {
+      "id": "posit-guide",
+      "title": "RStudio IDE User Guide",
+      "authors": "Posit",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://docs.posit.co/ide/user/",
+      "locator": "R Console、RStudio Projects、Executing code"
+    },
+    {
+      "id": "r-warning",
+      "title": "R Documentation: warning",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/warning.html",
+      "locator": "Details：警告受warn选项和处理器影响"
+    }
+  ],
+  "exerciseIds": [
+    "w01-l04-warning",
+    "w01-l04-state"
+  ],
+  "codeStatus": "not-run"
+}

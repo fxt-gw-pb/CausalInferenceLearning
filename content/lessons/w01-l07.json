@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "id": "w01-l07",
+  "week": 1,
+  "order": 7,
+  "title": "R 常用函数",
+  "summary": "掌握查看、取列、筛行、类型转换和描述统计，并为每个比例写清分母。",
+  "status": "ready",
+  "readingMinutes": 18,
+  "tags": [
+    "子集",
+    "描述统计",
+    "函数调用"
+  ],
+  "objectives": [
+    "正确使用数据框的行列索引。",
+    "区分数据中字段和全局同名对象。",
+    "计算含缺失的频数、比例与连续变量摘要。"
+  ],
+  "prerequisites": [
+    "w01-l05、w01-l06"
+  ],
+  "sections": [
+    {
+      "id": "inspect",
+      "title": "查看对象的四个层次",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "数据刚读入时，依次检查整体形状、列结构、实际码值和缺失。View便于浏览，head显示前几行，str说明结构，summary给出摘要。它们互相补充，任何一个单独使用都不足以证明整张数据已经正确。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "d <- data.frame(\n  id = paste0(\"p\", 1:6), A = c(0, 1, 0, 1, 0, 1),\n  age = c(40, 58, 63, 47, 71, 55),\n  score = c(2, 5, NA, 4, 8, 5), Y = c(1, 0, 0, 1, 1, NA)\n)\ndim(d); names(d)\nhead(d, 3)\nstr(d)\nsummary(d)\ncolSums(is.na(d))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "head(d,3)返回前三行，d[3,]返回第三行。宽表在控制台分段打印时仍是同一批观察值。看到省略提示后，应使用dim或nrow核实数据大小，不能把打印省略理解为记录被删除。"
+        }
+      ]
+    },
+    {
+      "id": "index",
+      "title": "逗号分开行与列",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "表达式",
+            "返回的内容"
+          ],
+          "rows": [
+            [
+              "d$age",
+              "age列向量"
+            ],
+            [
+              "d[, c(\"id\",\"age\")]",
+              "所有行的两列"
+            ],
+            [
+              "d[d$A == 1, ]",
+              "处理者的所有列"
+            ],
+            [
+              "d[\"age\"]",
+              "仅含age列的数据框"
+            ],
+            [
+              "d[, \"age\", drop=FALSE]",
+              "明确保留二维数据框结构"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "treated <- d[d$A == 1, , drop = FALSE]\nolder <- d[d$age >= 60, c(\"id\", \"age\"), drop = FALSE]\nstopifnot(nrow(treated) == 3, nrow(older) == 2)\n# 避免依赖全局同名变量，直接写d$A。\nA <- rep(0, nrow(d))\nstopifnot(nrow(d[d$A == 1, ]) == 3)\n# d[A == 1, ] 会误用上方全局A，得到0行。",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "d[i, j]中的i选择行、j选择列；d[j]采用列表式选列。遗漏逗号后，R可能试图用一个长逻辑向量选列并报未定义的列。另一个独立问题是裸A从哪里来：基础方括号不会自动把它限定在d内。若会话里恰好存在同名变量，代码甚至可能悄悄运行出错误子集。"
+        }
+      ]
+    },
+    {
+      "id": "missing",
+      "title": "含缺失的逻辑筛选",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "keep <- !is.na(d$score) & d$score >= 5\nhigh <- d[keep, , drop = FALSE]\nstopifnot(nrow(high) == 3, all(high$id == c(\"p2\", \"p5\", \"p6\")))\n# 仅d$score >= 5会产生NA判断，需明确缺失值去向。\nc(observed = sum(!is.na(d$score)), missing = sum(is.na(d$score)))\nmean(d$score, na.rm = TRUE)\nsd(d$score, na.rm = TRUE)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "score的五个已观测值为2、5、4、8、5，均值为4.8。na.rm=TRUE只是在该次计算中忽略缺失，不会自动修复原数据，也不说明缺失者与已观测者可交换。报告摘要时，把有效人数与缺失人数一起给出。"
+        }
+      ]
+    },
+    {
+      "id": "denominator",
+      "title": "频数表与比例的分母",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "tab <- table(d$A, d$Y, useNA = \"ifany\")\ntab\nprop.table(tab, margin = 1)  # 各处理组内，包含缺失列的比例\nobserved <- d[!is.na(d$Y), , drop = FALSE]\ntab_observed <- table(observed$A, observed$Y)\nprop.table(tab_observed, margin = 1)\nprop.table(tab_observed)    # 全部已观测记录中的比例",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "A=1的三个人中，Y=0、Y=1、缺失各一人。把缺失列纳入分母，事件占1/3；只看两个已观测结局者，事件占1/2。这两个数都能由相应定义算出，但回答的问题不同。通常应把事件比例与结局缺失率分别报告，不能默默删掉缺失后沿用全组分母的解释。"
+        },
+        {
+          "type": "paragraph",
+          "text": "prop.table(tab,1)按行标准化，prop.table(tab,2)按列标准化，不给margin则按整张表标准化。得到0.25表示25%，写作0.25%会缩小100倍。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "自测与修复",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w01-l07-index",
+          "prompt": "希望保留d中A=1的所有行，哪句最明确且不依赖全局A？",
+          "options": [
+            "d[A == 1]",
+            "d[d$A == 1, ]",
+            "d[, A == 1]"
+          ],
+          "answer": 1,
+          "explanation": "第二句显式定位字段，并把筛行条件放在逗号前。第一句是一维选列且依赖外部A，第三句把条件放在选列位置。"
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l07-denom",
+          "prompt": "处理组3人中1人发生事件、1人未发生、1人结局缺失。已观测者事件比例是：",
+          "options": [
+            "1/3",
+            "1/2",
+            "2/3"
+          ],
+          "answer": 1,
+          "explanation": "已观测结局者为2人，事件1人，比例1/2。报告时还需同时说明另1人的结局缺失；这一比例不自动等于全组事件风险。"
+        },
+        {
+          "type": "paragraph",
+          "text": "练习：在score中增加一个99作为约定的特殊缺失码，先观察均值如何变化，再按明确字典改为NA。把转换写成单独步骤，并保留原始列，方便审计。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-Extract.data.frame",
+      "title": "R Documentation: Extract.data.frame",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/Extract.data.frame.html",
+      "locator": "Details：单索引选列与双索引行列"
+    },
+    {
+      "id": "r-table",
+      "title": "R Documentation: table",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/table.html",
+      "locator": "useNA与交叉表"
+    },
+    {
+      "id": "r-proptable",
+      "title": "R Documentation: prop.table",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/proportions.html",
+      "locator": "margin与比例分母"
+    }
+  ],
+  "exerciseIds": [
+    "w01-l07-index",
+    "w01-l07-denom"
+  ],
+  "codeStatus": "not-run"
+}

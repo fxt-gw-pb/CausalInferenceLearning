@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "id": "w02-l01",
+  "week": 2,
+  "order": 1,
+  "title": "DAG 与混杂控制",
+  "summary": "把共同原因、中介和碰撞点放到具体路径上判断，利用可手算的选择例子理解错误调整。",
+  "status": "ready",
+  "readingMinutes": 23,
+  "tags": [
+    "共同原因",
+    "中介",
+    "碰撞点",
+    "路径"
+  ],
+  "objectives": [
+    "区分路径、方向和路径上的碰撞节点。",
+    "为总效应选择能够阻断后门路径的调整集。",
+    "解释为何收集一个变量与对它条件化不同。"
+  ],
+  "prerequisites": [
+    "w01-l02、w01-l03"
+  ],
+  "sections": [
+    {
+      "id": "graph",
+      "title": "把研究假设画成有向无环图",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "DAG由变量节点和有向箭头组成。箭头表示研究者认为存在的直接因果关系，直接的含义相对于图中已经列出的其他节点而言。没有箭头同样是一项假设。无环要求沿箭头前进不能回到同一节点；若现实存在反馈，可把同一变量分成不同时间点来表达。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本课以A表示提醒服务，Y表示失约，W表示服务前的困难程度。假设W影响A和Y，A也影响Y，则图中有A←W→Y与A→Y。路径是沿相连边从一个节点到另一个节点的路线，阅读路径时可以逆箭头走；判断是否有向因果路径时，才要求一路沿箭头从A指向Y。"
+        },
+        {
+          "type": "diagram",
+          "kind": "confounding-dag",
+          "caption": "基本混杂图：A←W→Y为后门路径，A→Y为有向因果路径。"
+        },
+        {
+          "type": "callout",
+          "title": "图提供结构推理",
+          "text": "数据中的相关性不能自动确定箭头方向。绘图软件能检查给定图的后果，但不会认证输入图符合真实机制。应记录图中依据与不确定边。",
+          "tone": "note"
+        }
+      ]
+    },
+    {
+      "id": "three-patterns",
+      "title": "三个局部结构的条件化后果",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "路径结构",
+            "中间节点的角色",
+            "对中间节点条件化"
+          ],
+          "rows": [
+            [
+              "A←W→Y",
+              "共同原因的叉形结构",
+              "可阻断这条非因果路径"
+            ],
+            [
+              "A→M→Y",
+              "中介链",
+              "会阻断这条有向因果路径"
+            ],
+            [
+              "A→S←Y",
+              "碰撞结构",
+              "可能打开原本阻断的路径"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "一个路径上的内部节点，只有当该路径相邻两条边都以箭头指向它时才是碰撞点。角色依赖所看的路径；同一节点可以在一条路径上是中介，在另一条路径上是碰撞点。判断不能只凭变量名称，也不能只数整张图中有几根箭头指向它。"
+        },
+        {
+          "type": "paragraph",
+          "text": "在DAG的路径判据中，非碰撞节点被条件化会阻断该路径；碰撞节点若自身及后代均未被条件化，则阻断路径。对碰撞点或其后代条件化可能激活该路径。最终是否产生开放连接，还要检查同一路径的其他节点及其他路径。"
+        }
+      ]
+    },
+    {
+      "id": "selection",
+      "title": "只看入选者如何产生关联",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "构造一个容易完整枚举的例子。A是是否收到提醒，U是是否存在较强的自主到诊动力，二者本来独立，均有一半为1。这个小例临时把Y=1定义为完成到诊，并设Y=U；与本课程其他例子中Y=1表示失约的方向不同。只有收到提醒或自主动力强的人会完成反馈问卷，记S=1。此时A对Y没有作用，但A和U共同影响S，形成A→S←U→Y。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "A",
+            "U",
+            "总体比例",
+            "进入问卷S=1",
+            "Y"
+          ],
+          "rows": [
+            [
+              "0",
+              "0",
+              "1/4",
+              "否",
+              "0"
+            ],
+            [
+              "0",
+              "1",
+              "1/4",
+              "是",
+              "1"
+            ],
+            [
+              "1",
+              "0",
+              "1/4",
+              "是",
+              "0"
+            ],
+            [
+              "1",
+              "1",
+              "1/4",
+              "是",
+              "1"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "总体中A=1和A=0的Y均值都为1/2。只分析S=1的人时，A=0者必须U=1，所以Y均值为1；A=1者中U仍一半为0、一半为1，所以Y均值为1/2。选择后出现−1/2的关联，完全由入选规则产生。记录S这列本身不会导致这一现象；筛选S=1、按S分层或在模型中固定S，才涉及条件化。"
+        },
+        {
+          "type": "code",
+          "language": "Python",
+          "execution": "verified",
+          "code": "from itertools import product\nrows = [dict(A=a, U=u, S=int(a == 1 or u == 1), Y=u)\n        for a, u in product((0, 1), repeat=2)]\ndef average(data, a):\n    ys = [r[\"Y\"] for r in data if r[\"A\"] == a]\n    return sum(ys) / len(ys)\ncrude = average(rows, 1) - average(rows, 0)\nselected = [r for r in rows if r[\"S\"] == 1]\nselected_difference = average(selected, 1) - average(selected, 0)\nassert crude == 0 and selected_difference == -0.5\nprint(crude, selected_difference)",
+          "caption": "原创Python标准库枚举；实际执行验证：总体差0，入选者差−0.5。"
+        }
+      ]
+    },
+    {
+      "id": "target",
+      "title": "总效应与变量角色一起变化",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "考虑A→M→Y、A→Y、U→M、U→Y。M一方面在A→M→Y上是中介，另一方面在A→M←U→Y上是碰撞点。估计A对Y的总效应时，调整M既阻断部分作用，又可能打开经U的非因果路径。仅说调整了一个强预测变量，无法描述这两个后果。"
+        },
+        {
+          "type": "paragraph",
+          "text": "如果问题改成M对Y的效应，A便可能成为M和Y的共同原因，调整决策随之变化。控制中介后得到的回归系数也不自动等于某种直接因果效应；直接效应还需要自己的定义、识别假设和模型。第八周会专门处理。"
+        }
+      ]
+    },
+    {
+      "id": "adjustment",
+      "title": "按图寻找调整集",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "固定目标暴露A、结局Y与总效应目标。",
+            "列出起始边指入A的后门路径。",
+            "寻找可阻断这些路径的变量集合，同时避免因条件化激活新的路径。",
+            "检查变量是否为处理后节点、是否可测、是否有目标人群中的支持。",
+            "对不确定箭头画出合理替代图，并说明调整结论是否改变。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "paragraph",
+          "text": "DAGitty等工具可辅助列出调整集，但需要明确暴露、结局、未测变量和全部箭头。一个最小充分调整集是删去其中任何元素就不再充分的集合；最小不等于在所有实际估计中方差最小，也不代表图外未测因素不存在。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l01-collider",
+          "prompt": "在A→M→Y和A→M←U→Y并存时，M的角色是：",
+          "options": [
+            "永远只能是中介",
+            "永远只能是碰撞点",
+            "分别在两条路径上承担中介和碰撞角色"
+          ],
+          "answer": 2,
+          "explanation": "角色是路径相对的。一个节点可以同时参与多个不同结构；这也是按变量名称机械归类容易失败的原因。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l01-measure",
+          "prompt": "数据库新增记录S，但分析中未筛选、分层或调整S。仅此一步会自动打开碰撞路径吗？",
+          "options": [
+            "会",
+            "不会；还需检查实际选择和条件化操作",
+            "只要S显著就会"
+          ],
+          "answer": 1,
+          "explanation": "收集一列与条件化该列不同。仍应审查样本原本是否经过与S相关的选择，但单纯记录不等于调整。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第6章：因果图；第8章：选择偏倚"
+    },
+    {
+      "id": "dagitty-manual",
+      "title": "DAGitty User Manual",
+      "authors": "Johannes Textor and contributors",
+      "year": "在线手册",
+      "url": "https://www.dagitty.net/manual-3.x.pdf",
+      "locator": "Causal effect identification 与 d-separation"
+    }
+  ],
+  "exerciseIds": [
+    "w02-l01-collider",
+    "w02-l01-measure"
+  ],
+  "codeStatus": "verified"
+}

@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 1,
+  "id": "w08-l01",
+  "week": 8,
+  "order": 1,
+  "title": "因果中介的目标与识别",
+  "summary": "用四个嵌套反事实均值组织自然直接和间接效应，推导中介公式并说明跨世界、时序与支持条件。",
+  "status": "ready",
+  "readingMinutes": 30,
+  "tags": [
+    "路径分解",
+    "自然效应",
+    "受控效应",
+    "识别条件"
+  ],
+  "objectives": [
+    "区分中介、混杂、碰撞变量及其时序",
+    "用 μ(a,a′) 写出两种正确的总效应分解",
+    "区分自然直接效应与受控直接效应",
+    "给出中介识别式和足够的假设集合"
+  ],
+  "prerequisites": [
+    "w02-l01",
+    "w02-l04",
+    "潜在结果；风险差与条件期望"
+  ],
+  "sections": [
+    {
+      "id": "timing",
+      "title": "路径、变量角色与时间顺序",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "设 A 为基线干预，M 为干预之后、结局之前的中介，Y 为结局，W 为干预前共同原因。中介分析把一个总效应分解为与指定 M 有关的部分。它需要先提出实质性的机制假说，再确定可操作的变量和测量时点。某变量同时与 A、Y 相关，不能单凭相关性把它命名为中介。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "关系",
+            "含义",
+            "分析注意"
+          ],
+          "rows": [
+            [
+              "W→A，W→M，W→Y",
+              "基线共同原因",
+              "合理控制这些路径中的混杂"
+            ],
+            [
+              "A→M→Y",
+              "经 M 的路径",
+              "估计总效应时，普通调整 M 可能阻断目标路径"
+            ],
+            [
+              "A→Y",
+              "不经该 M 的路径",
+              "直接效应仍可包含其他未选中介的路径"
+            ],
+            [
+              "A→Z→M，Z→Y",
+              "处理诱导的中介–结局混杂",
+              "自然效应的简单识别式通常不足"
+            ]
+          ],
+          "caption": "原创路径表。箭头是分析假设，观测数据不能单独验证整张因果图。"
+        },
+        {
+          "type": "paragraph",
+          "text": "总效应研究中，处理后变量可能不适合作为常规调整项；中介研究则将其显式纳入反事实目标。两种分析使用同一列数据，不代表估计同一量。随机分配 A 也只保障相应处理机制的可交换性，不会随机分配 M。"
+        }
+      ]
+    },
+    {
+      "id": "linear",
+      "title": "线性路径模型的条件化解释",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "E[M∣A,W]=α₀+αA A+αWᵀW；E[Y∣A,M,W]=β₀+βA A+βM M+βWᵀW。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若这些加性模型正确、没有 A×M 交互，并满足下文的因果识别条件，线性均值尺度上的间接效应可写为 αAβM，直接效应为 βA。例如 αA=0.6、βM=2、βA=1 时，间接效应 1.2、直接效应 1、总效应 2.2，单位均为结局单位。"
+        },
+        {
+          "type": "paragraph",
+          "text": "乘积公式依赖模型结构。二元结果的 logit 是非线性变换，两个回归系数的乘积一般不等于边际概率差上的间接效应。加入交互后，间接效应还可能随固定的处理状态变化。逐步要求每条路径显著，或只检验总效应是否显著，都不能替代目标定义与识别条件。正负路径抵消时，总效应也可能接近零。"
+        }
+      ]
+    },
+    {
+      "id": "potential",
+      "title": "嵌套反事实和四格均值",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "M(a)：A=a 下的中介；Y(a,m)：同时设 A=a、M=m 时的结局；μ(a,a′)=E[Y(a,M(a′))]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "μ(1,0) 将结局的处理状态设为 1，同时让中介取该人在 A=0 时的自然值。M(0) 因人而异，它不是把所有人的 M 固定为数值 0。这个量把两个干预世界的潜在变量放在同一个表达式中，因此识别条件比普通处理总效应更强。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "均值",
+            "结局端 A",
+            "中介来源",
+            "用途"
+          ],
+          "rows": [
+            [
+              "μ(0,0)",
+              "0",
+              "M(0)",
+              "未处理的自然结局均值"
+            ],
+            [
+              "μ(1,0)",
+              "1",
+              "M(0)",
+              "第一种分解的中间状态"
+            ],
+            [
+              "μ(0,1)",
+              "0",
+              "M(1)",
+              "第二种分解的中间状态"
+            ],
+            [
+              "μ(1,1)",
+              "1",
+              "M(1)",
+              "处理的自然结局均值"
+            ]
+          ]
+        },
+        {
+          "type": "equation",
+          "text": "PNDE=μ(1,0)−μ(0,0)；TNIE=μ(1,1)−μ(1,0)；TE=PNDE+TNIE。"
+        },
+        {
+          "type": "equation",
+          "text": "PNIE=μ(0,1)−μ(0,0)；TNDE=μ(1,1)−μ(0,1)；TE=PNIE+TNDE。"
+        },
+        {
+          "type": "paragraph",
+          "text": "P 与 T 分别表示 pure 与 total：它们指定另一环节的参照状态。加法分解来自中间项相消。PNDE+PNIE 一般没有这个抵消关系，不能把两个名字中都含 pure 的量随意相加。若采用 mediation 的记号，d0 对应 PNIE、d1 对应 TNIE，z0 对应 PNDE、z1 对应 TNDE。"
+        },
+        {
+          "type": "equation",
+          "text": "CDE(m)=E[Y(1,m)−Y(0,m)]。",
+          "caption": "受控直接效应将所有人的中介固定在指定值 m。它和自然直接效应回答不同干预问题。"
+        }
+      ]
+    },
+    {
+      "id": "identification",
+      "title": "中介公式与充分条件",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "μ(a,a′)=E_W[Σₘ Q(a,m,W) P(M=m∣A=a′,W)]；Q(a,m,w)=E[Y∣A=a,M=m,W=w]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "读这条式子可以分三步：先固定 W，预测各个 m 下的结局；再按 A=a′ 时的中介分布加权；最后按目标人群 W 分布平均。连续中介时求和改为积分。只把 M 固定在其平均值再预测，非线性下通常不等于对整个中介分布积分。"
+        },
+        {
+          "type": "list",
+          "items": [
+            "一致性与组合：实际接受 a、m 时的观测符合 Y(a,m)，且自然结局 Y(a)=Y(a,M(a))；明确干预版本并处理干扰。",
+            "处理可交换性：给定 W，A 与所需潜在中介、潜在结局独立，排除处理–中介和处理–结局的未测混杂。",
+            "中介–结局可交换性：给定 A、W，所需中介变化与 Y(a,m) 的潜在结局关系可作相应交换性论证。",
+            "自然效应的跨世界限制：一种充分结构还要求 Y(a,m) 与 M(a′) 在给定 W 后具有适当独立性；常用解释须排除处理诱导的中介–结局混杂。",
+            "正性与支持：需要观察到相关 W 下的两种处理，并且从 a′ 世界引入的中介取值在 a 世界的结果模型中有支持。"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "这些是一组便于教学的充分条件说明，不是从数据里检验全部成立的清单。仅在图上删去 Z，不会使它在现实中消失。Imai、Keele 与 Yamamoto 的识别论文给出形式化的序贯可忽略性条件；具体研究应明确采用哪一种识别框架。"
+        },
+        {
+          "type": "callout",
+          "title": "出现处理后混杂时",
+          "text": "若 A 影响 Z，Z 又影响 M 与 Y，直接把 Z 加进普通基线调整式通常不能恢复上述自然效应。可考虑另行定义干预型间接效应，并使用适合其时间结构的识别与估计方法；需要重写目标。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "binary-example",
+      "title": "二元中介的完整算例",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "构造无 W 的教学总体：P(M=1∣do(A=0))=0.6，P(M=1∣do(A=1))=0.2。假设识别条件成立，并给出下表结局风险。它们是设定值，不是任何真实研究的数据。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "A",
+            "Q(a,M=0)",
+            "Q(a,M=1)"
+          ],
+          "rows": [
+            [
+              "0",
+              "0.10",
+              "0.30"
+            ],
+            [
+              "1",
+              "0.08",
+              "0.20"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "例如 μ(1,0)=0.08×0.4+0.20×0.6=0.152。四格均值为 μ(0,0)=0.220、μ(0,1)=0.140、μ(1,0)=0.152、μ(1,1)=0.104。于是 TE=−0.116，第一种分解为 PNDE=−0.068 与 TNIE=−0.048；第二种为 PNIE=−0.080 与 TNDE=−0.036。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "pm={0:0.6,1:0.2}\nq={(0,0):0.10,(0,1):0.30,(1,0):0.08,(1,1):0.20}\nmu={(a,b):q[a,0]*(1-pm[b])+q[a,1]*pm[b]\n    for a in (0,1) for b in (0,1)}\npnde=mu[1,0]-mu[0,0]; tnie=mu[1,1]-mu[1,0]\npnie=mu[0,1]-mu[0,0]; tnde=mu[1,1]-mu[0,1]\ntotal=mu[1,1]-mu[0,0]\nassert abs(pnde+tnie-total)<1e-12\nassert abs(pnie+tnde-total)<1e-12\nassert abs(pnde+pnie-total)>0.01\nprint(mu)\nprint(pnde,tnie,pnie,tnde,total)",
+          "execution": "verified",
+          "caption": "原创有限状态中介公式核验，已执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例 CDE(0)=−0.02，CDE(1)=−0.10，均不同于 PNDE=−0.068。自然值分布和固定中介值之差在数值上十分明确。直接效应也只表示不经本节指定 M 的部分，不能将其解释为已经排除所有其他机制。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "常见误区与自测",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "把 M(0) 误读为固定 M=0；把观察到的 M 当成两个世界共有的常数。",
+            "把处理随机化当作中介也随机化。",
+            "在 logit 模型中直接使用线性 a×b 推出风险差。",
+            "在存在交互时忽略参照状态，错误配对直接和间接效应。"
+          ]
+        },
+        {
+          "type": "exercise",
+          "id": "w08-l01-pair",
+          "prompt": "给定 μ00=0.22、μ10=0.152、μ01=0.14、μ11=0.104，哪一对正确相加得到 TE？",
+          "options": [
+            "PNDE 与 PNIE",
+            "PNDE 与 TNIE",
+            "CDE(0) 与 PNIE"
+          ],
+          "answer": 1,
+          "explanation": "PNDE=μ10−μ00，TNIE=μ11−μ10，中间的 μ10 抵消，得到 μ11−μ00=−0.116。另两项一般没有这一代数恒等式。"
+        },
+        {
+          "type": "exercise",
+          "id": "w08-l01-natural",
+          "prompt": "自然直接效应中的 M(0) 表示什么？",
+          "options": [
+            "所有人的中介都被固定为 0",
+            "每个人在未接受处理时会具有的中介值",
+            "只选择观测 M=0 的人"
+          ],
+          "answer": 1,
+          "explanation": "M(0) 是潜在中介，允许不同人的自然值不同。固定 M=0 对应受控干预；只分析观测 M=0 的人则是条件选择，可能引入其他偏差。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "mediation-identification",
+      "title": "Identification, Inference and Sensitivity Analysis for Causal Mediation Effects",
+      "authors": "Kosuke Imai; Luke Keele; Teppei Yamamoto",
+      "year": 2010,
+      "url": "https://doi.org/10.1214/10-STS321",
+      "locator": "第3节定义与识别；第5节敏感性分析"
+    },
+    {
+      "id": "mediation-software",
+      "title": "mediation: R Package for Causal Mediation Analysis",
+      "authors": "Dustin Tingley; Teppei Yamamoto; Kentaro Hirose; Luke Keele; Kosuke Imai",
+      "year": 2014,
+      "url": "https://www.jstatsoft.org/article/view/v059i05",
+      "locator": "模型式中介估计与效应参照状态"
+    },
+    {
+      "id": "medoutcon",
+      "title": "Efficient estimation of natural and interventional (in)direct effects",
+      "authors": "Nima S. Hejazi; Iván Díaz; medoutcon contributors",
+      "year": "在线文档",
+      "url": "https://codex.nimahejazi.org/medoutcon/reference/medoutcon.html",
+      "locator": "自然与干预型效应、Z、estimator 与 nuisance learners"
+    }
+  ],
+  "exerciseIds": [
+    "w08-l01-pair",
+    "w08-l01-natural"
+  ],
+  "codeStatus": "verified"
+}

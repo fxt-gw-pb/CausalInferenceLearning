@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "id": "w01-l05",
+  "week": 1,
+  "order": 5,
+  "title": "R 程序与数据结构",
+  "summary": "通过向量、数据框、列表与因子，建立从数据含义到R存储结构的对应关系。",
+  "status": "ready",
+  "readingMinutes": 18,
+  "tags": [
+    "向量",
+    "数据框",
+    "列表"
+  ],
+  "objectives": [
+    "选择适合数据任务的基本对象结构。",
+    "区分分类标签、因子水平和内部编码。",
+    "避免混合类型强制转换与长度回收造成的隐蔽错误。"
+  ],
+  "prerequisites": [
+    "w01-l04"
+  ],
+  "sections": [
+    {
+      "id": "types",
+      "title": "先说变量含义，再看存储类型",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "一列0和1可能表示处理分组、二元结局，也可能是计数。整数存储只告诉R如何保存数值，不能自动替研究者解释它。对于分类变量，需要字典说明每个码值的意义；对于连续变量，需要单位和范围。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "R对象或类型",
+            "适合存放",
+            "例子"
+          ],
+          "rows": [
+            [
+              "numeric / integer",
+              "数值或整数",
+              "年龄、预约次数"
+            ],
+            [
+              "logical",
+              "逻辑判断",
+              "是否满足筛选条件，TRUE/FALSE"
+            ],
+            [
+              "character",
+              "文字字符串",
+              "匿名编号、备注、类别名称"
+            ],
+            [
+              "factor",
+              "带水平定义的分类变量",
+              "处理组与对照组"
+            ],
+            [
+              "data.frame",
+              "同样观察单位上的等长列",
+              "一人一行的分析表"
+            ],
+            [
+              "list",
+              "类型和长度可以不同的元素",
+              "模型、诊断、分析记录"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "本课的例子采用匿名模拟编号，不含真实个人资料。TRUE和FALSE是R的逻辑常量；T、F可被重新赋值，练习中使用完整写法。"
+        }
+      ]
+    },
+    {
+      "id": "vectors",
+      "title": "向量和逐元素运算",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "age <- c(32, 48, 61, 70)\nvisits <- c(1L, 2L, 3L, 1L)\neligible <- age >= 45\nid <- c(\"p01\", \"p02\", \"p03\", \"p04\")\nclass(age); class(visits); class(eligible)\nage + 1\nage[eligible]\nstopifnot(identical(eligible, c(FALSE, TRUE, TRUE, TRUE)))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "c()把元素组合成向量，age>=45逐人计算判断。age[eligible]取出判断为TRUE的位置。原子向量通常采用共同类型；把数字和文字混在同一个c()里，数值可能被转成字符。处理组标签和测量值应分别放在自己的列里。"
+        },
+        {
+          "type": "callout",
+          "title": "回收规则不保证含义正确",
+          "text": "R有时会重复较短的向量以完成逐元素运算。把四个人的数据与两个数相加可能不报错，但配对意义未必正确。关键派生变量应检查长度和观察单位的一一对应。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "tables",
+      "title": "数据框与列表的不同职责",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "d <- data.frame(\n  id = c(\"p01\", \"p02\", \"p03\", \"p04\"),\n  age = c(32, 48, 61, 70),\n  A = c(0L, 1L, 1L, 0L),\n  missed = c(1L, 0L, 0L, 1L),\n  stringsAsFactors = FALSE\n)\nstr(d)\nstopifnot(nrow(d) == 4, ncol(d) == 4, !anyDuplicated(d$id))\nrecord <- list(data = d, outcome = \"30天内失约\", n = nrow(d))\nrecord$n\nrecord[[\"data\"]][, \"age\"]",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "数据框各列长度相同，每行对应同一个预约者。列表则能同时装入整张数据框、一个说明字符串和一个样本数。record[\"data\"]返回含该元素的子列表；record[[\"data\"]]取出元素本身，即数据框。模型返回值常具有列表式结构，理解这个区别有助于以后提取系数和预测。"
+        },
+        {
+          "type": "paragraph",
+          "text": "矩阵适合共同存储类型的二维数值运算。若把包含id文字的整张表转为普通矩阵，数值列也可能一起变成字符。unlist()把嵌套元素展平，通常不能保证恢复原来的表形状、列类型和因子属性。"
+        }
+      ]
+    },
+    {
+      "id": "factor",
+      "title": "分类标签与内部编码",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "raw_group <- c(0, 1, 1, 0)\ngroup <- factor(raw_group, levels = c(0, 1),\n                labels = c(\"usual\", \"reminder\"))\nlevels(group)\nas.integer(group)  # 内部索引：1, 2, 2, 1\nstopifnot(identical(as.character(group),\n                    c(\"usual\", \"reminder\", \"reminder\", \"usual\")))\n\nnumeric_labels <- factor(c(\"10\", \"20\", \"10\"))\nwrong <- as.numeric(numeric_labels)\nrecovered <- as.numeric(as.character(numeric_labels))\ndata.frame(label = as.character(numeric_labels), wrong, recovered)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "group显示usual和reminder，但内部保存的可能是1和2。as.numeric(factor)返回内部编码，不能用于恢复原始0/1或10/20。只有标签本身确实是合法数值字符串时，先as.character再as.numeric才有恢复数值含义；usual这样的文字类别应按已核实的映射处理。"
+        },
+        {
+          "type": "paragraph",
+          "text": "回归采用默认处理对比时，第一个因子水平通常作为参考水平，因此显式设定levels比依赖自动排序稳妥。更换参考水平会改变系数的比较方向和标签；研究问题中的A=1和A=0也要同步解释。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "自测与对象检查",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w01-l05-factor",
+          "prompt": "factor(c(\"20\",\"10\"), levels=c(\"10\",\"20\"))再直接as.numeric，得到什么？",
+          "options": [
+            "20、10",
+            "2、1",
+            "0、1"
+          ],
+          "answer": 1,
+          "explanation": "levels的第一项10编码为1，第二项20编码为2。直接转数值得到内部位置2、1。原标签需要通过字符转换恢复。"
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l05-dataframe",
+          "prompt": "包含id文字列和年龄数值列的数据，最适合先存为：",
+          "options": [
+            "一个混合原子向量",
+            "每列可有自身类型的数据框",
+            "先全部转成因子"
+          ],
+          "answer": 1,
+          "explanation": "一人一行的数据框保留变量分工和列类型。全部因子化会改变连续变量的建模含义。"
+        },
+        {
+          "type": "paragraph",
+          "text": "练习：创建五个人的预约表，增加一个可能缺失的基线评分。依次报告行列数、每列class、处理码值和id是否重复。把这些检查放在脚本中，后面导入真实文件时仍能复用。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-factor",
+      "title": "R Documentation: factor",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/factor.html",
+      "locator": "Details与Warning：编码、levels及as.numeric警告"
+    },
+    {
+      "id": "r-Extract.data.frame",
+      "title": "R Documentation: Extract.data.frame",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/Extract.data.frame.html",
+      "locator": "矩阵式与列表式索引"
+    },
+    {
+      "id": "r-intro",
+      "title": "An Introduction to R",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://cran.r-project.org/doc/manuals/r-release/R-intro.html",
+      "locator": "Vectors、Factors、Lists and data frames"
+    }
+  ],
+  "exerciseIds": [
+    "w01-l05-factor",
+    "w01-l05-dataframe"
+  ],
+  "codeStatus": "not-run"
+}

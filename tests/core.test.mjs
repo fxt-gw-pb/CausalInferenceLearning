@@ -1,0 +1,15 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {standardize,percent,points} from '../src/math.js';
+import {freshState,validateState,loadState,saveState,toggleId,searchLessons,STORAGE_KEY} from '../src/state.js';
+const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-12,`${a} ≠ ${b}`);
+test('standardization uses common target weights',()=>{const x=standardize(.5);close(x.mu0,.24);close(x.mu1,.17);close(x.rd,-.07);close(x.rr,17/24);close(x.crude0,.168);close(x.crude1,.224);close(x.crudeRd,.056);});
+test('target endpoints agree with stratum effects',()=>{close(standardize(0).rd,-.04);close(standardize(1).rd,-.10);});
+test('monotonic heterogeneous effects and unchanged crude risk',()=>{for(let i=0;i<=100;i++){const x=standardize(i/100);close(x.rd,-.04-.06*i/100);close(x.crudeRd,.056);assert.ok(x.mu0>=0&&x.mu0<=1&&x.mu1>=0&&x.mu1<=1);}});
+test('reject malformed probabilities',()=>{for(const x of [-.01,1.01,NaN,Infinity,'0.5',null])assert.throws(()=>standardize(x),RangeError);assert.throws(()=>standardize(.5,2),RangeError);});
+test('percentage point display and percent display',()=>{assert.equal(percent(.17),'17.0%');assert.equal(points(-.07),'-7.0');assert.equal(points(.056),'+5.6');});
+test('sanitize stored state with deduplication and known IDs',()=>{const v=validateState({bookmarks:['a','a','bad'],completed:['b',null],answers:{good:1,bad:Infinity,'<x>':0},lastLesson:'bad'},['a','b']);assert.deepEqual(v.bookmarks,['a']);assert.deepEqual(v.completed,['b']);assert.deepEqual(v.answers,{good:1});assert.equal(v.lastLesson,null);});
+test('null state and corrupt storage safely recover',()=>{assert.deepEqual(validateState(null,[]),freshState());assert.equal(loadState({getItem(){return'{oops'}},[]).persisted,false);assert.equal(loadState(null,[]).persisted,false);});
+test('storage writes are catchable and state roundtrips',()=>{const d={},storage={getItem:k=>d[k],setItem:(k,v)=>d[k]=v};const s={...freshState(),bookmarks:['w02-l04']};assert.equal(saveState(storage,s),true);assert.ok(d[STORAGE_KEY]);assert.deepEqual(loadState(storage,['w02-l04']).state,s);assert.equal(saveState({setItem(){throw Error('denied')}},s),false);});
+test('bookmark toggling is reversible',()=>{assert.deepEqual(toggleId(['a'],'a'),[]);assert.deepEqual(toggleId(['a'],'b'),['a','b']);});
+test('search supports Chinese, Latin, multiple terms and no HTML',()=>{const rows=[{title:'潜在结果与标准化',summary:'G 计算',tags:['ATE'],sections:[]},{title:'倾向得分',summary:'IPW',tags:['ATE'],sections:[]}];assert.equal(searchLessons(rows,'标准化').length,1);assert.equal(searchLessons(rows,'g ate').length,1);assert.equal(searchLessons(rows,'  ').length,0);assert.equal(searchLessons(rows,'<script>').length,0);});

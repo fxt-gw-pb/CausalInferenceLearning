@@ -1,0 +1,303 @@
+{
+  "schemaVersion": 1,
+  "id": "w05-l03",
+  "week": 5,
+  "order": 3,
+  "title": "双重稳健估计的 R 实现",
+  "summary": "先手写逐折AIPW，再核对AIPW与DoubleMLIRM接口；保留折号、概率诊断和推断条件，避免把软件输出当作识别验证。",
+  "status": "ready",
+  "readingMinutes": 35,
+  "tags": [
+    "R",
+    "交叉拟合 AIPW",
+    "DoubleMLIRM",
+    "概率截断",
+    "影响函数标准误"
+  ],
+  "objectives": [
+    "手写外层交叉拟合并核验每个人只获得一次折外预测。",
+    "从AIPW信号计算ATE与有条件的一阶标准误。",
+    "核对Q/g方向、IRM学习器输出和截断敏感性。"
+  ],
+  "prerequisites": [
+    "AIPW公式与证明",
+    "PLR和IRM目标区别",
+    "R循环、glm、预测与数据框"
+  ],
+  "sections": [
+    {
+      "id": "workflow-and-scope",
+      "title": "同一目标、同一数据的实现流程",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "本课比较的目标均为二元基线处理在全人群中的平均风险差。先生成独立模拟数据，再用基础R手写交叉拟合AIPW，使每个数组的来源可检查；随后展示AIPW包与DoubleMLIRM的对应接口。三条实现使用不同学习器或分折时，点估计会有差异，不能把数值不完全相同直接归因于错误。"
+        },
+        {
+          "type": "paragraph",
+          "text": "实际研究应先固定分析对象：纳入人群、时间零点、处理、结局窗口、W的测量时间和缺失策略。同一研究背景下的不同提取文件可能包含不同患者和不同结局定义。只有同目标、同样本、同尺度的输出才适合直接比较。"
+        },
+        {
+          "type": "callout",
+          "title": "代码验证范围",
+          "text": "本课R代码完成静态逻辑与已查阅接口的核对，尚未在R环境运行，因此不列软件点估计、标准误或截图式结果。上一课及本课前文的Python小算例只验证代数，不替代R执行。",
+          "tone": "note"
+        },
+        {
+          "type": "paragraph",
+          "text": "手写例子有意使用正确形式的二项GLM，将学习器复杂性降到最低，便于检查折分与得分。随后更换SL或森林时，仍应保留同样的样本分离、输出断言与设计诊断。"
+        }
+      ]
+    },
+    {
+      "id": "simulate",
+      "title": "模拟设定与固定折分",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "set.seed(5103)\nn <- 1200L\nW1 <- runif(n, -1, 1)\nW2 <- rbinom(n, 1, 0.4)\ne_true <- plogis(-0.2 + 0.7 * W1 + 0.5 * W2)\nA <- rbinom(n, 1, e_true)\nq_true <- function(a) plogis(-1 + 0.6 * W1 + 0.3 * W2 -\n                            0.4 * a + 0.2 * a * W1)\nY <- rbinom(n, 1, q_true(A))\nd <- data.frame(A = A, Y = Y, W1 = W1, W2 = W2)\nstopifnot(!anyNA(d), all(A %in% 0:1), all(Y %in% 0:1))\ntruth_given_W <- mean(q_true(1) - q_true(0))\nK <- 5L\nset.seed(5104)\nfold <- sample(rep(seq_len(K), length.out = n))\n# 随机划分不依赖A、Y；随后检查各折类别数量。\nstopifnot(all(fold %in% seq_len(K)))\nprint(table(fold, A))\nprint(table(fold, Y))",
+          "execution": "not-run",
+          "caption": "原创模拟；未运行。W有界，使设定中的处理概率远离0和1。truth_given_W仅在模拟中可知。"
+        },
+        {
+          "type": "paragraph",
+          "text": "K=5是本例计算选择，不构成一致性或覆盖率保证。折分保存到fold向量，而非只保存seed，因为后续代码、包版本或随机调用顺序变化都可能改变实际划分。若按患者、医院或家庭抽样，必须使用与相关结构相符的划分与推断。"
+        }
+      ]
+    },
+    {
+      "id": "crossfit",
+      "title": "逐折拟合与三组预测",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "q1 <- q0 <- ehat <- rep(NA_real_, n)\nfilled <- integer(n)\nfold_audit <- vector(\"list\", K)\nfor (k in seq_len(K)) {\n  test <- which(fold == k)\n  train <- which(fold != k)\n  stopifnot(length(intersect(train, test)) == 0L,\n            length(unique(d$A[train])) == 2L,\n            length(unique(d$Y[train])) == 2L)\n  train_data <- d[train, , drop = FALSE]\n  # 处理模型只以W预测A。\n  fit_e <- glm(A ~ W1 + W2, family = binomial(), data = train_data)\n  # 结果模型允许A与W交互。\n  fit_Q <- glm(Y ~ A * (W1 + W2), family = binomial(), data = train_data)\n  new0 <- new1 <- d[test, , drop = FALSE]\n  new0$A <- 0L\n  new1$A <- 1L\n  ehat[test] <- predict(fit_e, newdata = d[test, ], type = \"response\")\n  q0[test] <- predict(fit_Q, newdata = new0, type = \"response\")\n  q1[test] <- predict(fit_Q, newdata = new1, type = \"response\")\n  filled[test] <- filled[test] + 1L\n  fold_audit[[k]] <- list(train = train, test = test,\n    converged_e = fit_e$converged, converged_Q = fit_Q$converged)\n}\nstopifnot(all(filled == 1L), all(is.finite(c(q0, q1, ehat))),\n          all(q0 >= 0 & q0 <= 1), all(q1 >= 0 & q1 <= 1),\n          all(ehat > 0 & ehat < 1),\n          all(vapply(fold_audit, function(x) x$converged_e && x$converged_Q,\n                     logical(1))))",
+          "execution": "not-run",
+          "caption": "未运行。每个测试折得到同一行索引下的q0、q1、ehat；filled断言阻止遗漏或重复赋值。"
+        },
+        {
+          "type": "paragraph",
+          "text": "新数据中的Y列不会参与predict的右侧公式；为进一步减少意外依赖，也可只传入公式所需的A、W列。预测类型response确保二项GLM输出概率。若公式中有交互，glm会根据新的A重新计算；若提前手工生成交互列，则须像上一周一样重新生成。"
+        },
+        {
+          "type": "paragraph",
+          "text": "将fit_Q换成SL时，每个外层训练集内都要独立完成SL候选选择、内部CV与最终拟合，再向这个外层测试折预测。先全样本调参或填补，再声称外层完全隔离，会使被留出数据参与训练过程。执行日志应记录失败候选与收敛警告，不要静默换模型或改目标。"
+        }
+      ]
+    },
+    {
+      "id": "estimate-and-infer",
+      "title": "从信号到风险差和标准误",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "h1 <- q1 + d$A * (d$Y - q1) / ehat\nh0 <- q0 + (1 - d$A) * (d$Y - q0) / (1 - ehat)\nh <- h1 - h0\nestimate <- mean(h)\nDhat <- h - estimate\nse <- sd(Dhat) / sqrt(n)\nresult <- c(mu1 = mean(h1), mu0 = mean(h0), RD = estimate,\n            SE = se, lower = estimate - qnorm(.975) * se,\n            upper = estimate + qnorm(.975) * se,\n            truth_given_W = truth_given_W)\nstopifnot(abs(mean(Dhat)) < 1e-12)\nprint(result)\n# 同一套折外预测下的两个单模型估计，便于检查分解。\nprint(c(G = mean(q1 - q0),\n        IPW_HT = mean(d$A * d$Y / ehat -\n                      (1 - d$A) * d$Y / (1 - ehat)),\n        AIPW = estimate))",
+          "execution": "not-run",
+          "caption": "未运行。SE与Wald区间是满足相应识别、矩、重叠、学习收敛和渐近线性条件时的一阶近似。"
+        },
+        {
+          "type": "equation",
+          "text": "D̂ᵢ = Ĥᵢ − ψ̂；SE(ψ̂) ≈ sd(D̂ᵢ)/√n"
+        },
+        {
+          "type": "paragraph",
+          "text": "把影响函数理解为一个观察对估计量的一阶贡献，有助于理解标准误为何用其样本方差除以n。这个近似针对独立观察与相应总体目标；聚类资料需适当聚合贡献，复杂抽样或其他目标也要改变推断方式。两函数都足够一致且误差乘积足够小时，可支持常见交叉拟合AIPW的一阶理论；仅凭软件算出se不能验证这些条件。"
+        },
+        {
+          "type": "paragraph",
+          "text": "Dhat均值近于0只是我们定义estimate=mean(h)后的代数结果，无论拟合是否好都可能成立。因此它适合检查公式拼接，不能作为没有偏差的证据。一次模拟估计接近truth_given_W同样不能验证95%覆盖率；验证性能需要重复生成数据，并预先定义偏差、RMSE和区间覆盖等指标。"
+        }
+      ]
+    },
+    {
+      "id": "probability-diagnostics",
+      "title": "概率、平衡与截断敏感性",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "ess <- function(x) sum(x)^2 / sum(x^2)\nsensitivity <- function(bound) {\n  ep <- pmin(1 - bound, pmax(bound, ehat))\n  weights <- ifelse(d$A == 1, 1 / ep, 1 / (1 - ep))\n  signal <- q1 - q0 + d$A * (d$Y - q1) / ep -\n            (1 - d$A) * (d$Y - q0) / (1 - ep)\n  c(bound = bound, changed = mean(ep != ehat), RD = mean(signal),\n    max_weight = max(weights),\n    ESS1 = ess(weights[d$A == 1]), ESS0 = ess(weights[d$A == 0]))\n}\nprint(tapply(ehat, d$A, quantile, probs = c(0, .01, .5, .99, 1)))\nprint(t(vapply(c(0, .01, .025, .05, .1), sensitivity, numeric(6))))\nw <- ifelse(d$A == 1, 1/ehat, 1/(1-ehat))\nsmd <- function(x, weights) {\n  a <- d$A == 1\n  scale <- sqrt((var(x[a]) + var(x[!a])) / 2)\n  if (scale == 0) return(NA_real_)\n  (weighted.mean(x[a], weights[a]) - weighted.mean(x[!a], weights[!a])) / scale\n}\nprint(data.frame(variable = c(\"W1\", \"W2\"),\n  before = vapply(d[c(\"W1\", \"W2\")], smd, numeric(1), weights = rep(1,n)),\n  after = vapply(d[c(\"W1\", \"W2\")], smd, numeric(1), weights = w)))",
+          "execution": "not-run",
+          "caption": "未运行。bound=0保留原概率；其余只是透明敏感性设定，无默认最佳界限。"
+        },
+        {
+          "type": "paragraph",
+          "text": "如果某些边界改变了很多概率，或估计随界限剧烈变化，要回到支持集、模型校准和贡献集中问题。真实e处于截断区域时，固定截断会破坏e正确的分支。以更少波动换取潜在偏差是一项分析选择，应保留原始诊断。双重稳健也不能把不支持的人群比较变得可识别。"
+        },
+        {
+          "type": "paragraph",
+          "text": "平衡与权重检查仍是必要的辅助诊断，不能根据某个阈值宣称识别成立。参数形式、复杂度和不同随机划分的稳定性可一并报告；不要从几十套模型中只挑结果最显著的一套。"
+        }
+      ]
+    },
+    {
+      "id": "package-interfaces",
+      "title": "AIPW 与 DoubleMLIRM 的接口对应",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "接口",
+            "本网站符号",
+            "职责"
+          ],
+          "rows": [
+            [
+              "AIPW：Q.SL.library",
+              "Q₀、Q₁",
+              "结局回归学习器"
+            ],
+            [
+              "AIPW：g.SL.library",
+              "e",
+              "暴露/处理概率学习器"
+            ],
+            [
+              "AIPW：k_split",
+              "外层K",
+              "1表示未交叉拟合，至少2才进行外层划分"
+            ],
+            [
+              "DoubleMLIRM：ml_g",
+              "Q₀、Q₁",
+              "条件结局学习器"
+            ],
+            [
+              "DoubleMLIRM：ml_m",
+              "e",
+              "二元处理概率学习器"
+            ],
+            [
+              "DoubleMLIRM：score=\"ATE\"",
+              "ψ",
+              "全人群平均效应得分"
+            ]
+          ]
+        },
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 可选分支一：在本课模拟d上运行AIPW包。\npkgs <- c(\"AIPW\", \"SuperLearner\", \"glmnet\", \"ranger\")\nstopifnot(all(vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)))\nlibrary(SuperLearner)\n# 普通GLM基准：k_split=1，明确没有外层交叉拟合。\nfit_glm <- AIPW::AIPW$new(\n  Y = d$Y, A = d$A, W = d[c(\"W1\", \"W2\")],\n  Q.SL.library = \"SL.glm\", g.SL.library = \"SL.glm\",\n  k_split = 1, verbose = FALSE\n)\nfit_glm$fit()\nfit_glm$summary(g.bound = 0.025)\n# 再运行SL与五折交叉拟合；两者的变化需一并记录。\nset.seed(5105)\nfit_aipw <- AIPW::AIPW$new(\n  Y = d$Y, A = d$A, W = d[c(\"W1\", \"W2\")],\n  Q.SL.library = c(\"SL.mean\", \"SL.glm\", \"SL.glmnet\", \"SL.ranger\"),\n  g.SL.library = c(\"SL.mean\", \"SL.glm\", \"SL.glmnet\", \"SL.ranger\"),\n  k_split = 5, verbose = FALSE\n)\nfit_aipw$fit()\nfit_aipw$summary(g.bound = 0.025)\nfit_aipw$plot.p_score()\nfit_aipw$plot.ip_weights()",
+          "execution": "not-run",
+          "caption": "未运行。此可选分支显式使用0.025界限，与前面的未截断手写结果有不同配置；先核对诊断再比较。"
+        },
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 可选分支二：IRM-ATE；与PLR残差回归使用不同模型和得分。\npkgs <- c(\"DoubleML\", \"mlr3\", \"mlr3learners\", \"ranger\")\nstopifnot(all(vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)))\nlibrary(mlr3)\nlibrary(mlr3learners)\nset.seed(5106)\nobj <- DoubleML::DoubleMLData$new(\n  data = d, y_col = \"Y\", d_cols = \"A\", x_cols = c(\"W1\", \"W2\")\n)\n# 0/1结局可用森林回归拟合条件均值；处理必须输出P(A=1|W)。\nml_g <- mlr3::lrn(\"regr.ranger\", num.trees = 500, min.node.size = 10)\nml_m <- mlr3::lrn(\"classif.ranger\", predict_type = \"prob\",\n                 num.trees = 500, min.node.size = 10)\nfit_irm <- DoubleML::DoubleMLIRM$new(\n  data = obj, ml_g = ml_g, ml_m = ml_m,\n  n_folds = 5, n_rep = 3, score = \"ATE\",\n  trimming_rule = \"truncate\", trimming_threshold = 0.025\n)\nfit_irm$fit()\nfit_irm$summary()\nfit_irm$confint()\nprint(sessionInfo())",
+          "execution": "not-run",
+          "caption": "未运行。mlr3learners负责注册ranger学习器；包版本与实际返回字段须在运行环境中核对。"
+        },
+        {
+          "type": "paragraph",
+          "text": "普通GLM基准只用于对照接口，Q候选的默认主效应未必表达模拟中的A×W1交互；其e模型在本模拟中具有正确形式。它与SL版本同时改变了学习器和外层划分，因此结果差不能单独归因于某一种改变。若要比较交叉拟合的影响，应固定其余设定。"
+        },
+        {
+          "type": "paragraph",
+          "text": "AIPW包和DoubleML在命名上不统一：AIPW里的g代表处理模型，DoubleMLIRM的ml_g代表结果模型。因此应以所估计的条件均值或概率核对，避免只记字母。5折3重复指重新划分后重复拟合。当前DoubleML文档使用各重复点估计的中位数汇总，R实现还将分折差异纳入其标准误汇总；它不等于简单均值，也不等于获得15套独立样本。复现时仍需记录实际包版本。"
+        },
+        {
+          "type": "paragraph",
+          "text": "IRM使用分别允许变化的处理与对照结果函数，其ATE得分与AIPW相联系。PLR则用ℓ与m残差化，并在相应结构下估计θ。对象命名采用fit_irm，能在复查时直接看出模型选择。下一周的TMLE将沿着同一因果目标，学习怎样通过靶向更新构造概率受约束的代入式估计。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "练习与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w05-l03-ex1",
+          "prompt": "手写循环结束后，有一人的filled值为0，最合适的处理是",
+          "options": [
+            "以0填补他的Q预测后继续",
+            "忽略该行并沿用原始n",
+            "检查折号与赋值索引，修复后重新产生完整折外预测",
+            "把K改成1并称作交叉拟合"
+          ],
+          "answer": 2,
+          "explanation": "filled=0说明该行没有获得预测，可能由折分、索引或循环错误导致。随意补0或丢行会改变估计与目标，且破坏分母一致性。应修复流程并再次检查filled全部为1、预测有限及训练/测试互斥。"
+        },
+        {
+          "type": "exercise",
+          "id": "w05-l03-ex2",
+          "prompt": "DoubleMLIRM中的ml_m使用分类器，predict_type应当提供",
+          "options": [
+            "硬分类标签，以便权重为整数",
+            "二元处理的条件概率",
+            "结局的logit系数",
+            "真实个体治疗效果"
+          ],
+          "answer": 1,
+          "explanation": "IRM中的ml_m估计e(W)=P(A=1|W)，得分需要概率作为分母。硬标签0/1会产生零分母。ml_g负责结局函数，不能因命名与AIPW包里的g相同而交换两者。"
+        },
+        {
+          "type": "exercise",
+          "id": "w05-l03-ex3",
+          "prompt": "Dhat的样本均值非常接近0，可以用来支持的结论是",
+          "options": [
+            "没有未测混杂",
+            "两类模型均正确",
+            "信号中心化的代数步骤符合预期",
+            "95%区间必然有95%覆盖"
+          ],
+          "answer": 2,
+          "explanation": "Dhat定义为h−mean(h)，其均值按构造即为0。这是实现检查，无法验证识别、学习器正确性或区间覆盖。研究假设论证、诊断和推断条件仍需要分别完成。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "aipw-api",
+      "title": "AIPW class reference",
+      "authors": "AIPW package authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://yqzhong7.github.io/AIPW/reference/AIPW.html",
+      "locator": "Q.SL.library, g.SL.library, k_split and summary(g.bound)"
+    },
+    {
+      "id": "dml-irm",
+      "title": "DoubleMLIRM R reference",
+      "authors": "DoubleML authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://docs.doubleml.org/r/stable/reference/DoubleMLIRM.html",
+      "locator": "Model, ml_g, ml_m, n_folds, n_rep and score arguments"
+    },
+    {
+      "id": "dml-scores",
+      "title": "DoubleML: Score functions",
+      "authors": "DoubleML authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://docs.doubleml.org/stable/guide/scores.html",
+      "locator": "Neyman orthogonality; PLR partialling-out and IV-type; binary IRM ATE"
+    },
+    {
+      "id": "dml-paper",
+      "title": "Double/Debiased Machine Learning for Treatment and Structural Parameters",
+      "authors": "Victor Chernozhukov; Denis Chetverikov; Mert Demirer; Esther Duflo; Christian Hansen; Whitney Newey; James Robins",
+      "year": 2018,
+      "url": "https://doi.org/10.1111/ectj.12097",
+      "locator": "Published in The Econometrics Journal 21: C1–C68; Sections 2–3, 4.1 and 5.1"
+    },
+    {
+      "id": "dml-resampling",
+      "title": "DoubleML: Sample-splitting, cross-fitting and repeated cross-fitting",
+      "authors": "DoubleML authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://docs.doubleml.org/stable/guide/resampling.html",
+      "locator": "Repeated cross-fitting: median aggregation and variance adjustment"
+    }
+  ],
+  "exerciseIds": [
+    "w05-l03-ex1",
+    "w05-l03-ex2",
+    "w05-l03-ex3"
+  ],
+  "codeStatus": "not-run",
+  "statusNote": "正文、模拟设定与代码静态检查已完成；本课 R 代码尚未实际运行，暂不提供软件输出。"
+}

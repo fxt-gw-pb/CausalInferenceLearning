@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "id": "w02-l02",
+  "week": 2,
+  "order": 2,
+  "title": "DAG 与回归应用",
+  "summary": "把回归表中的系数放回指定因果问题，区分条件比较、边际比较和表二谬误。",
+  "status": "ready",
+  "readingMinutes": 22,
+  "tags": [
+    "调整集",
+    "条件效应",
+    "边际效应"
+  ],
+  "objectives": [
+    "解释线性、logistic和Cox输出各自的尺度。",
+    "说明为什么同一回归表的所有系数不能统一当成总效应。",
+    "用一个无混杂例子计算条件OR和边际OR的差别。"
+  ],
+  "prerequisites": [
+    "w02-l01；回归公式和条件均值"
+  ],
+  "sections": [
+    {
+      "id": "regression",
+      "title": "回归需要先指定用途",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "回归可以描述关联、预测结局，也可以作为因果估计中的一个计算步骤。公式写得相同并不代表研究目标相同。用于因果分析时，先固定一个暴露及其目标效应，再说明为何选择这些调整变量，最后解释模型的尺度和函数形式。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "模型",
+            "一个常见表达",
+            "处理系数常见含义"
+          ],
+          "rows": [
+            [
+              "线性均值模型",
+              "E[Y|A,W]=α+βA+g(W)",
+              "若无A交互，β是条件均值差"
+            ],
+            [
+              "Logistic模型",
+              "logit P(Y=1|A,W)=α+βA+g(W)",
+              "exp(β)是无A交互时的条件优势比"
+            ],
+            [
+              "Cox比例风险模型",
+              "h(t|A,W)=h₀(t)exp(βA+g(W))",
+              "在模型及比例风险假设下，exp(β)是条件瞬时风险比"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "logit(p)=log[p/(1−p)]把概率转到对数优势尺度。它没有把二元结局变成正态分布。hazard则是给定尚未发生事件时的瞬时事件率，与截止某日的累计事件概率不同；HR不能直接改名为风险比。"
+        }
+      ]
+    },
+    {
+      "id": "table-two",
+      "title": "一张回归表，多个不同问题",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "假设基线困难W影响提醒A和失约Y；提醒A影响点击链接M，M再影响Y，且A也可直接影响Y。模型Y~A+W+M中，A的系数固定了M，无法直接表示包含点击途径的总效应。若把W改为目标暴露，则A可能成为W影响Y的一条中介路径，原来的调整角色又改变了。"
+        },
+        {
+          "type": "paragraph",
+          "text": "把多变量模型中每一行都称为该变量的独立总效应，常被称为表二谬误。模型针对A选择的调整集，未必也是针对W、M各自效应所需的集合。应针对每个确实要回答的暴露问题重新画图、定义比较和选择调整集。"
+        },
+        {
+          "type": "callout",
+          "title": "固定中介后的系数有额外门槛",
+          "text": "它可能是一个条件关联参数。解释为受控或自然直接效应，需要更明确的目标、混杂条件和交互处理；仅把中介放进模型不够。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "odds",
+      "title": "优势比不能直接当风险比",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "odds = p/(1−p)；若条件OR=k，则 p₁ = k p₀ / (1−p₀+k p₀)",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "例如在某一风险层，未提醒风险p₀=0.20，条件OR=0.50，则提醒风险为0.50×0.20/(0.80+0.10)=1/9≈11.11%。风险差约−8.89个百分点，风险比约0.556。三个尺度相关，但数值和解释不同。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "p0 <- 0.20\nconditional_OR <- 0.50\np1 <- conditional_OR * p0 / (1 - p0 + conditional_OR * p0)\nc(p1 = p1, RD = p1-p0, RR = p1/p0,\n  OR = (p1/(1-p1))/(p0/(1-p0)))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        }
+      ]
+    },
+    {
+      "id": "noncollapsibility",
+      "title": "没有混杂也可能出现不同OR",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "构造两层各占一半的总体，并让处理随机分配，所以A与W独立。未处理风险分别为10%和50%；两层条件OR都为2，因此不存在logit尺度的A×W交互。相应处理风险分别为2/11和2/3。"
+        },
+        {
+          "type": "equation",
+          "text": "μ₀ = (0.10+0.50)/2 = 0.30；μ₁ = (2/11+2/3)/2 = 14/33",
+          "caption": ""
+        },
+        {
+          "type": "equation",
+          "text": "边际OR = [μ₁/(1−μ₁)] / [μ₀/(1−μ₀)] = 98/57 ≈ 1.7193",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "边际OR与两层共同的条件OR=2不同。这里没有混杂，差异来自OR的非可折叠性与先平均风险再取优势比的非线性运算。由此可见，调整前后OR变化不必然等于去除了混杂；无交互也不一般保证条件OR与边际OR相等。"
+        },
+        {
+          "type": "code",
+          "language": "Python",
+          "execution": "verified",
+          "code": "from fractions import Fraction as F\np0 = [F(1,10), F(1,2)]\np1 = [2*p/(1-p+2*p) for p in p0]\nmu0, mu1 = sum(p0)/2, sum(p1)/2\nmarginal_or = (mu1/(1-mu1))/(mu0/(1-mu0))\nassert marginal_or == F(98,57)\nprint(float(mu0), float(mu1), float(marginal_or))",
+          "caption": "原创Python精确分数运算；实际执行验证：μ₀=0.3、μ₁≈0.42424、边际OR≈1.71930。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "自测与回归表注释",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w02-l02-or",
+          "prompt": "上述随机分配例中，调整W后条件OR为2，边际OR约1.72。差异足以证明混杂吗？",
+          "options": [
+            "足以",
+            "不足；本例差异来自OR非可折叠性",
+            "只有样本很大时才足以"
+          ],
+          "answer": 1,
+          "explanation": "反例已设定A与W独立。条件与边际OR仍可不同，不能仅用系数变化诊断混杂。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l02-target",
+          "prompt": "研究提醒总效应时，模型中加入提醒后的点击M。最需先检查的是：",
+          "options": [
+            "M的P值是否小于0.05",
+            "M是否在作用或选择路径上，以及调整后目标是否改变",
+            "模型R²是否提高"
+          ],
+          "answer": 1,
+          "explanation": "因果角色和目标决定是否应该调整。预测表现与显著性不能替代这一步。"
+        },
+        {
+          "type": "paragraph",
+          "text": "练习：给一张自造回归表增加三列文字说明：目标暴露、比较尺度、该行能否按当前图解释为目标因果效应。允许把其他协变量行写为辅助调整参数，而不强行解释其因果作用。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第15章：倾向得分；关于条件与边际效应及效应尺度的讨论"
+    },
+    {
+      "id": "r-family",
+      "title": "R Documentation: family",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/family.html",
+      "locator": "binomial与logit链接"
+    },
+    {
+      "id": "table2",
+      "title": "The Table 2 Fallacy: Presenting and Interpreting Confounder and Modifier Coefficients",
+      "authors": "Daniel Westreich; Sander Greenland",
+      "year": 2013,
+      "url": "https://doi.org/10.1093/aje/kws412",
+      "locator": "针对不同暴露的调整集及系数解释"
+    }
+  ],
+  "exerciseIds": [
+    "w02-l02-or",
+    "w02-l02-target"
+  ],
+  "codeStatus": "not-run"
+}

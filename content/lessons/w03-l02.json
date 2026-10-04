@@ -1,0 +1,327 @@
+{
+  "schemaVersion": 1,
+  "id": "w03-l02",
+  "week": 3,
+  "order": 2,
+  "title": "倾向得分的应用与诊断",
+  "summary": "完成先设计后结局的倾向得分分析，检查重叠、协变量平衡、权重尾部与匹配后目标，再扩展到生存和剂量分析。",
+  "status": "ready",
+  "readingMinutes": 35,
+  "tags": [
+    "目标人群",
+    "重叠",
+    "平衡",
+    "匹配与权重诊断"
+  ],
+  "objectives": [
+    "实现并诊断一个可手算核对的IPW分析。",
+    "区分重叠、平衡、ESS和因果识别。",
+    "给匹配、分层、回归调整和加权结果写明目标与方差处理。",
+    "识别连续GPS代码中的密度、交互及支持问题。"
+  ],
+  "prerequisites": [
+    "w03-l01；第二周回归与G计算；R函数"
+  ],
+  "sections": [
+    {
+      "id": "design",
+      "title": "先设计比较，再查看结局差",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "本课采用与第二周一致的原创1000人合成表，A=提醒，Y=30天失约，W=基线风险层。因果结构假定W足以控制混杂，干预明确定义且完整随访。PS设计阶段先固定目标人群、协变量、匹配或加权方案，并检查可比性，再查看结局对比，减少为追求结果而反复修改设计的诱因。"
+        },
+        {
+          "type": "list",
+          "items": [
+            "预设目标：全体合成人群ATE，尺度为风险差。",
+            "预设调整信息：W为基线共同原因；id不入模型；没有处理后变量。",
+            "估计e(W)，查看两组得分的支持范围和协变量分布。",
+            "实施目标对应的设计，检查平衡、丢弃情况及权重。",
+            "只有诊断可接受后才计算结局，并使用与设计相匹配的推断。"
+          ],
+          "ordered": true
+        }
+      ]
+    },
+    {
+      "id": "r-ipw",
+      "title": "从合成表估计PS与权重",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 原创合成1000人；W为处理前风险层，Y为30天失约。\ncells <- data.frame(A=c(0,0,1,1), W=c(0,1,0,1),\n                    n=c(400,100,100,400), events=c(80,50,10,120))\nd <- do.call(rbind, lapply(seq_len(nrow(cells)), function(j) {\n  z <- cells[j, ]\n  data.frame(A=rep(z$A,z$n), W=rep(z$W,z$n),\n             Y=c(rep(1,z$events),rep(0,z$n-z$events)))\n}))\nrownames(d) <- NULL\nd$id <- seq_len(nrow(d))\nps_fit <- glm(A ~ W, data=d, family=binomial(), na.action=na.fail)\nd$ps <- predict(ps_fit, type=\"response\")\nstopifnot(ps_fit$converged, all(d$ps > 0 & d$ps < 1))\nd$w_ate <- ifelse(d$A==1, 1/d$ps, 1/(1-d$ps))\nd$w_att <- ifelse(d$A==1, 1, d$ps/(1-d$ps))\nweighted_mean <- function(x,w) sum(w*x)/sum(w)\ncontrast <- function(weights) {\n  i1 <- d$A==1; i0 <- d$A==0\n  weighted_mean(d$Y[i1],weights[i1]) -\n    weighted_mean(d$Y[i0],weights[i0])\n}\nc(ATE_RD=contrast(d$w_ate), ATT_RD=contrast(d$w_att))\nstopifnot(max(abs(d$ps-ifelse(d$W==1,.8,.2))) < 1e-6,\n          abs(contrast(d$w_ate)+.15)<1e-6,\n          abs(contrast(d$w_att)+.18)<1e-6)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "四格表可独立验证，ATE权重应得到风险1=.20、风险0=.35、RD=−.15；ATT应得到RD=−.18。这里采用各组权重总和归一化的Hájek均值。当前未在R中执行，因此上述断言是供读者验收的预期结果，不能当作软件已经通过测试的证据。"
+        }
+      ]
+    },
+    {
+      "id": "overlap",
+      "title": "重叠和平衡分别检查",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "重叠检查两组在相关W及PS范围中是否有可比较观察，避免大量外推。协变量平衡检查设计后各W的分布是否接近。得分密度图看起来重叠，不足以证明每个协变量都平衡；各协变量均值接近，也不保证尾部、方差、非线性项或联合分布相同。"
+        },
+        {
+          "type": "equation",
+          "text": "SMD = (W̄₁−W̄₀) / s_ref；本课固定 s_ref = √[(s₁,原²+s₀,原²)/2]",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "为方便手算，二元W的原始总体式方差取p(1−p)。原始两组高风险比例为0.8和0.2，s_ref=0.4，因此SMD=1.5。ATE加权后两组都为0.5，SMD为0。固定调整前分母使前后变化可比；软件在目标、人群与二元变量上的默认标准化约定可能不同，应查文档并报告。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 使用上段创建的d；本例W是二元变量。\np1 <- mean(d$W[d$A==1]); p0 <- mean(d$W[d$A==0])\ns_ref <- sqrt((p1*(1-p1)+p0*(1-p0))/2)\np1w <- weighted_mean(d$W[d$A==1],d$w_ate[d$A==1])\np0w <- weighted_mean(d$W[d$A==0],d$w_ate[d$A==0])\nc(SMD_before=(p1-p0)/s_ref, SMD_after=(p1w-p0w)/s_ref)\nstopifnot(abs((p1-p0)/s_ref-1.5)<1e-10,\n          abs(p1w-p0w)<1e-6)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "callout",
+          "title": "阈值用于诊断，不能认证因果",
+          "text": "|SMD|<0.1是常见经验参照，绝非无未测混杂或无偏的证明。应结合变量的重要性、分布图、样本量、残余差异和研究目标判断。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "weights",
+      "title": "权重尾部和有效样本量",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "ESS = (Σᵢwᵢ)² / Σᵢwᵢ²",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "ESS量化权重集中程度。即使原样本很多，少数极大权重也可能让信息集中在少数人身上。本例每组原有500人，各组权重总和1000、平方和3125，ESS=320；两组分别报告比只看合并ESS更容易发现单侧信息不足。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "ess <- function(w) sum(w)^2/sum(w^2)\ntapply(d$w_ate, d$A, ess)\nquantile(d$w_ate, c(0,.5,.9,.99,1))\ntapply(d$w_ate, d$A, max)\nstopifnot(all(abs(tapply(d$w_ate,d$A,ess)-320)<1e-5))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "截断或修剪权重会改变偏倚与方差的平衡，删掉某些观察还可能改变目标人群。应预先说明规则，报告多少人或多少权重受到影响，并比较结果敏感性。把最大权重设为一个看上去顺眼的数，不会自动补齐缺失支持。ESS也不是所有估计器标准误的精确替代。"
+        }
+      ]
+    },
+    {
+      "id": "matching",
+      "title": "匹配距离、卡钳与目标要一起报告",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "最近邻匹配要说明谁作锚点、是否允许重复使用对照、匹配比例、距离尺度、卡钳和未匹配人数。logistic模型估出的PS与logit(PS)是不同距离尺度。以某种尺度的标准差定义0.2卡钳，也要报告所用尺度；仅写distance=\"logit\"的旧接口名称不足以说明匹配发生在logit尺度。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 可选示例：需要已安装MatchIt，当前未执行；不安装软件。\nif (!requireNamespace(\"MatchIt\", quietly=TRUE)) stop(\"需要MatchIt\")\nmatched <- MatchIt::matchit(\n  A ~ W, data=d, method=\"nearest\", estimand=\"ATT\",\n  distance=\"glm\", link=\"linear.logit\",\n  caliper=.2, std.caliper=TRUE, replace=FALSE, ratio=1\n)\nsummary(matched)\npackageVersion(\"MatchIt\")",
+          "caption": "依照MatchIt维护者文档写的原创可选R示例；当前未执行，包版本与实际保留样本须运行后检查。"
+        },
+        {
+          "type": "paragraph",
+          "text": "该调用围绕ATT设计，但卡钳或没有足够对照时可能丢弃处理者。本例高风险处理者多、同层对照少，1:1不放回匹配会遇到资源限制。要报告实际保留的处理者构成，不能自动仍称原始处理者ATT。软件不支持某个目标时也不应捕获错误后静默换成默认目标。"
+        },
+        {
+          "type": "paragraph",
+          "text": "匹配完成后，观察具有配对或匹配组结构。1:1配对可以从每对的结局差出发；1:k、重复使用对照和复杂匹配则需相应权重与方差方法。普通独立两样本检验忽略这些依赖。对最近邻匹配，普通bootstrap也并非一律适用，须采用有理论支持的推断方法。"
+        }
+      ]
+    },
+    {
+      "id": "comparison",
+      "title": "并列结果时给每种方法一个完整说明",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "方法",
+            "目标或解释",
+            "诊断与推断重点"
+          ],
+          "rows": [
+            [
+              "粗风险差",
+              "原始两组关联",
+              "不得自动标成因果ATE"
+            ],
+            [
+              "最近邻匹配",
+              "处理者或实际保留者的平均效果",
+              "配对/匹配组、删人、距离和卡钳"
+            ],
+            [
+              "PS分层",
+              "按明确目标权重汇总的层内比较",
+              "残余混杂、每层两组支持、估计分层的不确定性"
+            ],
+            [
+              "PS结果回归调整",
+              "取决于模型和标准化方式",
+              "函数形式与交互；未直接生成重加权人群"
+            ],
+            [
+              "ATE IPW",
+              "全体目标人群均值差",
+              "权重尾部、平衡、估计权重与设计相关方差"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "在本例PS只有两个值，直接按其两个实际层分层可精确恢复四格标准化。连续PS分四层时通常只是近似，不能因为分了四层就宣称所有混杂已消除。用A和PS拟合线性结果模型时，A系数的边际效应含义也依赖模型结构；一般可再用干预预测和标准化明确目标。"
+        }
+      ]
+    },
+    {
+      "id": "survival",
+      "title": "生存结局复用设计，但另设终点分析",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "如果处理分配和基线W不变，同一个PS设计可以服务于不同结局；每个结局仍要有自己的时间和事件定义。加权Cox与PS调整Cox通常对应不同的条件化方式，HR本身又受风险集和非可折叠性影响，不能把它们的差异都归为控制混杂的多少。"
+        },
+        {
+          "type": "paragraph",
+          "text": "匹配生存模型需考虑匹配组相关，常用按匹配组聚类的稳健方差；加权模型也要使用合适的方差估计，并说明是否考虑PS估计。与此同时检查比例风险、删失和固定时间风险。协变量平衡没有处理失访偏倚，HR=0.6也不能直接翻译成整个窗口风险降低40%。"
+        }
+      ]
+    },
+    {
+      "id": "gps-practice",
+      "title": "连续剂量预测时重新计算GPS",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "下面是原创的已知参数计算，用来检查算法顺序。假定连续剂量A给定W服从均值1+W、标准差0.6的正态分布；结果模型在剂量a、密度r处的风险为expit(−2+0.4a+0.3r+0.2ar)。它是构造模型，不是从真实数据估得，也不证明因果识别。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "target_W <- c(0,0,1,1)\nr_at <- function(a,w) dnorm(a, mean=1+w, sd=.6)\nmu_at <- function(a) {\n  r <- r_at(a,target_W)\n  mean(plogis(-2 + .4*a + .3*r + .2*a*r))\n}\nmu1 <- mu_at(1)\nmu2 <- mu_at(2)\nc(risk_at_1=mu1, risk_at_2=mu2, dose_RD=mu2-mu1)\n# 不把.4直接当作风险差；r也随干预剂量改变。",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "每个剂量a都重新计算r(a,W)，再进入结果模型并平均。即使把r暂时固定，logit尺度的A斜率也为0.4+0.2r；转到概率尺度又有非线性。因此抽取主系数0.4或指数化它，不能替代目标剂量风险差。正式GPS分析还需要估计密度模型、检查残差与支持，并传播两阶段估计不确定性。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若原A只有0至9的离散评分，连续密度只是额外建模近似；可以考虑按实际支持定义多水平处理或有边界的剂量对比。相关系数接近0只是有限诊断，同均值不同方差的反例仍提醒我们检查更完整的分布。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "本周综合自测",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w03-l02-ess",
+          "prompt": "本例一个处理组Σw=1000、Σw²=3125，ESS为：",
+          "options": [
+            "500",
+            "320",
+            "1000"
+          ],
+          "answer": 1,
+          "explanation": "ESS=1000²/3125=320，反映权重不均带来的信息集中。它与原始人数、权重总和各有不同含义。"
+        },
+        {
+          "type": "exercise",
+          "id": "w03-l02-caliper",
+          "prompt": "卡钳匹配丢弃了较难匹配的处理者。最应补充报告的是：",
+          "options": [
+            "仍按默认标签写原始ATT即可",
+            "实际保留者及目标改变，同时检查平衡与推断",
+            "只报告更小的P值"
+          ],
+          "answer": 1,
+          "explanation": "删掉处理者会改变被平均的人群。应说明保留人数、构成及结果适用范围，不能静默延用原目标。"
+        },
+        {
+          "type": "exercise",
+          "id": "w03-l02-gps-model",
+          "prompt": "GPS结果模型含A、r、A×r。计算μ(a)时应：",
+          "options": [
+            "只读取A主系数",
+            "把观测r固定不动，只改A",
+            "将A改为a、重新计算r(a,W)，预测后按目标分布平均"
+          ],
+          "answer": 2,
+          "explanation": "GPS随目标剂量变化。第三项才对应剂量a的标准化预测流程，且仍需识别、模型及支持条件。"
+        },
+        {
+          "type": "paragraph",
+          "text": "综合作业：提交一页设计报告，写明目标人群、A/Y编码、W时序、PS模型、重叠、每个协变量的平衡、两组ESS、权重规则、效果尺度和推断方法。再把目标从ATE改为ATT，只修改目标相关步骤并解释结果差异。不要把不同目标的数字排成一张优劣排行榜。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第12、15、17章：加权、倾向得分和生存结局"
+    },
+    {
+      "id": "matchit-nearest",
+      "title": "MatchIt: Nearest Neighbor Matching",
+      "authors": "MatchIt maintainers",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://kosukeimai.github.io/MatchIt/reference/method_nearest.html",
+      "locator": "Estimand、caliper、replace与目标人群说明"
+    },
+    {
+      "id": "matchit-distance",
+      "title": "MatchIt: Propensity scores and other distance measures",
+      "authors": "MatchIt maintainers",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://kosukeimai.github.io/MatchIt/reference/distance.html",
+      "locator": "distance=\"glm\"与link=\"linear.logit\""
+    },
+    {
+      "id": "hirano-imbens",
+      "title": "The Propensity Score with Continuous Treatments",
+      "authors": "Keisuke Hirano; Guido W. Imbens",
+      "year": 2004,
+      "url": "https://doi.org/10.1002/0470090456.ch7",
+      "locator": "GPS结果模型与平均剂量反应"
+    },
+    {
+      "id": "abadie-imbens-2008",
+      "title": "On the Failure of the Bootstrap for Matching Estimators",
+      "authors": "Alberto Abadie; Guido W. Imbens",
+      "year": 2008,
+      "url": "https://doi.org/10.3982/ECTA6474",
+      "locator": "固定近邻匹配估计的普通bootstrap适用性；Econometrica 76(6):1537–1557"
+    }
+  ],
+  "exerciseIds": [
+    "w03-l02-ess",
+    "w03-l02-caliper",
+    "w03-l02-gps-model"
+  ],
+  "codeStatus": "not-run"
+}

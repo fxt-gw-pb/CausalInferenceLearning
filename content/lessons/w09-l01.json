@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "id": "w09-l01",
+  "week": 9,
+  "order": 1,
+  "title": "处理效应异质性",
+  "summary": "区分总体平均、条件平均和个体处理效应；理解效应尺度、预设亚组、风险评分与探索性分组。",
+  "status": "ready",
+  "readingMinutes": 23,
+  "tags": [
+    "ATE",
+    "CATE",
+    "个体效应",
+    "亚组与尺度"
+  ],
+  "objectives": [
+    "区分 ATE、CATE、GATE 与不可直接观察的 ITE",
+    "用同一风险比构造风险差异质性",
+    "用组间对比而非两个 p 值判断效应差异",
+    "分清基线风险、效应评分和决策规则"
+  ],
+  "prerequisites": [
+    "w02-l04",
+    "w05-l01",
+    "条件期望；交互项"
+  ],
+  "sections": [
+    {
+      "id": "objects",
+      "title": "处理效应的不同对象",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "ITEᵢ=Yᵢ(1)−Yᵢ(0)；τ(x)=E[Y(1)−Y(0)∣X=x]；ATE=E[τ(X)]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "同一个人通常只观察一个处理世界的结局，因而其真实 ITE 无法直接从该记录读出。CATE 是具备同样基线特征 X 的人群的平均效应。给某位对象预测 τ̂(Xᵢ)，得到的是其特征条件下的平均值预测；模型并没有观察到这个人的另一个反事实。"
+        },
+        {
+          "type": "equation",
+          "text": "GATE(G)=E[Y(1)−Y(0)∣G(X)=1]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "G 是预先定义或由独立发现资料确定的亚组规则。GATE 对一个人群平均，比完整的高维函数 τ(x) 更容易解释。这里令 X 包含识别所需基线协变量；如果只想按少数修饰变量 V 报告 CATE，也必须通过完整基线 W 控制混杂，再把效应对 W∣V 平均。只按 V 分层通常不足。"
+        },
+        {
+          "type": "paragraph",
+          "text": "从观察资料将 τ(x) 写为 Q₁(x)−Q₀(x)，仍需一致性、条件交换性和两组支持。森林、神经网络或集成模型不会代替这些前提。"
+        }
+      ]
+    },
+    {
+      "id": "scale",
+      "title": "异质性依赖效应尺度",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "人群层",
+            "未处理风险 p₀",
+            "处理风险 p₁",
+            "RR",
+            "RD"
+          ],
+          "rows": [
+            [
+              "较低基线风险",
+              "0.10",
+              "0.08",
+              "0.80",
+              "−0.02"
+            ],
+            [
+              "较高基线风险",
+              "0.40",
+              "0.32",
+              "0.80",
+              "−0.08"
+            ]
+          ],
+          "caption": "原创风险表：相对效应相同，绝对效应不同。"
+        },
+        {
+          "type": "paragraph",
+          "text": "两层均相对减少 20% 风险，但绝对事件风险分别减少 2 和 8 个百分点。如果两层各占一半，总体未处理风险为 0.25、处理风险为 0.20，ATE 风险差为 −0.05。不能只说效应存在或不存在异质性，而不注明尺度。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "p0=[0.10,0.40]\np1=[0.08,0.32]\nrd=[b-a for a,b in zip(p0,p1)]\nrr=[b/a for a,b in zip(p0,p1)]\nate=sum(rd)/2\nassert all(abs(r-0.8)<1e-12 for r in rr)\nassert abs(ate+0.05)<1e-12\nprint(rd,rr,ate)",
+          "execution": "verified",
+          "caption": "原创尺度算例，已执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "logistic 回归的 A×X 系数对应条件 log odds 尺度的交互。它不直接等于 RD 的交互。可在拟合模型后标准化两组风险，分别报告风险差或风险比，并为相应组间对比建立推断。"
+        }
+      ]
+    },
+    {
+      "id": "subgroups",
+      "title": "预设亚组与交互检验",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "预设亚组应具有明确的研究依据、可测量性和足够样本支持。先写出对比，例如 Δ=ψ高−ψ低。某组显著、另一组不显著不能证明 Δ≠0，因为两组标准误也可能不同。需要直接估计 Δ 和相应不确定性。"
+        },
+        {
+          "type": "paragraph",
+          "text": "假设两组效应都为 −0.05，标准误分别为 0.01 和 0.04。第一组与零的比较可能显著，第二组可能不显著，但点估计之间的差恰好为零。这个例子展示了显著性标签与效应差异是两个对象。"
+        },
+        {
+          "type": "list",
+          "items": [
+            "预先规定分组变量、阈值、主尺度和主要对比，避免看到结果后反复寻找最显著切点。",
+            "每组继续检查混杂、处理正性、事件数与样本结构。",
+            "记录探索的比较数量；正式确认需要独立验证或适合多重选择的推断。"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "scores",
+      "title": "风险评分、效应评分与决策",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "基线风险 r₀(x)=E[Y(0)∣X=x]；效应评分 τ(x)=E[Y(1)−Y(0)∣X=x]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "风险评分定位容易发生结局的人；效应评分定位干预相对于不干预改变结局较多的人。前面的同 RR 算例中，高基线风险者有较大的绝对获益，但这是一种特定结构，不能推广为高风险者必然获益更大。风险分层后也仍需控制混杂。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若 Y=1 表示不良事件，负 RD 表示降低事件风险，数值越负表示预计绝对获益越大。按 τ̂ 从小到大排序时，第一组对应更负的预测效应；建议使用低预测 RD/高预测 RD 这类中性标签，并单独注明方向。"
+        },
+        {
+          "type": "paragraph",
+          "text": "决策规则还涉及成本、不良后果、约束与外部有效性。仅有 τ̂(x)<0 不足以构成真实个体的治疗建议。把估计函数用于决策，需要为明确的决策目标和新场景进行额外验证。"
+        }
+      ]
+    },
+    {
+      "id": "validation",
+      "title": "探索与验证的分工",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "高维异质性研究往往先探索，再确认。探索资料可用于训练 τ̂、选择特征和阈值；评估资料用已冻结的规则形成亚组，并重新估计其效应。评估集的 Y 不应回流到规则选择中。若数据有限，可采用有理论支持的交叉拟合方案，但每一步的索引和目标必须清楚。"
+        },
+        {
+          "type": "paragraph",
+          "text": "预测 CATE 的分布、重要性或解释图可以描述模型。它们不自动提供某个协变量是因果修饰因素的证据。后续课程将区分模型描述、组平均效应推断和对模型选择过程的处理。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w09-l01-individual",
+          "prompt": "模型对小林的基线特征给出 τ̂=−0.07，准确表述是什么？",
+          "options": [
+            "已经观测到小林的处理使风险下降 7 个百分点",
+            "在指定假设和模型下，这类特征人群的平均风险差预测为 −0.07",
+            "小林接受处理一定不会发生结局"
+          ],
+          "answer": 1,
+          "explanation": "CATE 是特征条件人群的平均因果量。它带有估计误差与识别条件，不能恢复某个人已经发生与未发生的两个潜在世界。"
+        },
+        {
+          "type": "exercise",
+          "id": "w09-l01-significance",
+          "prompt": "两个亚组效应同为 −0.05，其中一组 p<0.05、另一组 p>0.05。能据此确认异质性吗？",
+          "options": [
+            "能，两个显著性标签不同",
+            "不能，应直接检验两组效应之差",
+            "只需把较小 p 值作为结论"
+          ],
+          "answer": 1,
+          "explanation": "组内检验的原假设分别为各组效应等于零；异质性检验的原假设是两组效应相同。这三个假设不同，必须构造所关心的直接对比。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "meta-learners",
+      "title": "Metalearners for estimating heterogeneous treatment effects using machine learning",
+      "authors": "Sören R. Künzel; Jasjeet S. Sekhon; Peter J. Bickel; Bin Yu",
+      "year": 2019,
+      "url": "https://doi.org/10.1073/pnas.1804597116",
+      "locator": "S、T、X 学习器的定义与适用情形"
+    },
+    {
+      "id": "causal-forest",
+      "title": "Estimation and Inference of Heterogeneous Treatment Effects using Random Forests",
+      "authors": "Stefan Wager; Susan Athey",
+      "year": 2018,
+      "url": "https://arxiv.org/abs/1510.04342",
+      "locator": "honesty、因果森林的一致性与渐近推断条件"
+    },
+    {
+      "id": "grf-average-effects",
+      "title": "Get doubly robust estimates of average treatment effects",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/reference/average_treatment_effect.html",
+      "locator": "AIPW、TMLE、target.sample 与 subset 条件"
+    }
+  ],
+  "exerciseIds": [
+    "w09-l01-individual",
+    "w09-l01-significance"
+  ],
+  "codeStatus": "verified"
+}

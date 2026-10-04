@@ -1,0 +1,205 @@
+{
+  "schemaVersion": 1,
+  "id": "w04-l04",
+  "week": 4,
+  "order": 4,
+  "title": "Super Learner 的 R 实现",
+  "summary": "用独立模拟数据串起变量检查、SL结果模型、干预预测、处理模型、加权诊断和执行记录。",
+  "status": "ready",
+  "readingMinutes": 30,
+  "tags": [
+    "R",
+    "SuperLearner",
+    "结果标准化",
+    "加权诊断",
+    "可复现分析"
+  ],
+  "objectives": [
+    "逐项核对二元编码、协变量和学习器依赖。",
+    "实现两次干预预测并计算风险差。",
+    "读懂cvRisk和coef，审慎安排置信区间。"
+  ],
+  "prerequisites": [
+    "第4周前3课",
+    "R数据框、函数与预测",
+    "二项GLM与加权均值"
+  ],
+  "sections": [
+    {
+      "id": "analysis-contract",
+      "title": "建立可复查的分析对象",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "本课按结果回归、干预标准化、处理模型、权重和平衡的顺序实现上一课流程。使用独立模拟数据，A表示在基线采取一项监测策略，Y表示30天内结局，severity与comorbidity均在处理之前测量。模拟设定只用于训练计算技能，不能视为临床效果证据。"
+        },
+        {
+          "type": "paragraph",
+          "text": "真实研究中，同样名为死亡的变量可能对应院内、30天、180天或随访结束时死亡；同一项目不同数据提取的行数、缺失处理与纳入标准也可能不同。在比较方法前，先固定分析人群、处理定义、结局窗口和调整集。只因文件名相似便对比跨文件ATE，会把目标变化误认为估计器差异。"
+        },
+        {
+          "type": "callout",
+          "title": "执行范围",
+          "text": "本课R代码完成了接口与逻辑静态核对，但当前未实际运行R及其依赖。代码提供可执行学习流程，不展示未经验证的软件输出。运行后应保留版本、警告、折分和诊断结果。",
+          "tone": "note"
+        },
+        {
+          "type": "paragraph",
+          "text": "模拟故意加入A与严重程度的交互。若结局模型只放主效应，可能遗漏处理效果随W变化的结构。这里把交互特征按预先规则显式生成；修改A后会同步重算它。特征由已知代数定义，无须借用验证集结局来决定。"
+        }
+      ]
+    },
+    {
+      "id": "simulate-and-check",
+      "title": "生成数据与检查编码",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "needed <- c(\"SuperLearner\", \"glmnet\")\nmissing <- needed[!vapply(needed, requireNamespace, logical(1), quietly = TRUE)]\nif (length(missing)) stop(\"请先准备这些包：\", paste(missing, collapse = \", \"))\nlibrary(SuperLearner) # 让默认环境能找到All与SL.*包装函数。\nset.seed(4104)\nn <- 800\nseverity <- runif(n, -1.5, 1.5)\ncomorbidity <- rbinom(n, 1, 0.35)\ne_true <- plogis(-0.25 + 0.65 * severity + 0.5 * comorbidity)\nA <- rbinom(n, 1, e_true)\nq <- function(a) plogis(-1.3 + 0.6 * severity + 0.5 * comorbidity -\n                        0.45 * a + 0.25 * a * severity)\nY <- rbinom(n, 1, q(A))\nd <- data.frame(A, Y, severity, comorbidity)\nstopifnot(!anyNA(d), all(d$A %in% c(0, 1)), all(d$Y %in% c(0, 1)))\nW <- d[c(\"severity\", \"comorbidity\")]\nfeatures_Q <- function(a, w) {\n  data.frame(A = a, severity = w$severity,\n             comorbidity = w$comorbidity,\n             A_severity = a * w$severity)\n}\nXQ <- features_Q(d$A, W)\nprint(table(d$A, d$Y))\nprint(summary(d))\n# 仅在模拟中可知的条件平均效应，用于后续数值检查。\ntruth_given_W <- mean(q(1) - q(0))",
+          "execution": "not-run",
+          "caption": "原创模拟；未运行。truth_given_W是当前W样本对应的真实风险差，区别于无限总体ATE和观测粗差。"
+        },
+        {
+          "type": "paragraph",
+          "text": "在真实文件中，先用table核对原始标签。若二元值为Yes/No，可先断言所有非缺失值都在这两个标签内，再显式转换。直接把Yes以外的一切都当0会隐藏拼写、未知或缺失编码。多类别协变量要设定恰当factor水平；不要让1、2、3编码在无意中变成等距连续量。"
+        },
+        {
+          "type": "paragraph",
+          "text": "训练和预测必须使用一致的列名、类型与分类水平。缺失值填补、标准化或特征筛选如由样本学习，则应嵌入相应训练折；本例数据完整且使用预先定义的数值特征，省略了这些步骤。"
+        }
+      ]
+    },
+    {
+      "id": "fit-outcome",
+      "title": "学习结果概率并计算 G 估计",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "library_names <- c(\"SL.mean\", \"SL.glm\", \"SL.glmnet\")\nset.seed(4105)\nfit_Q <- SuperLearner::SuperLearner(\n  Y = d$Y, X = XQ, family = binomial(),\n  SL.library = library_names, method = \"method.NNLS\",\n  cvControl = list(V = 5, stratifyCV = TRUE)\n)\nprint(fit_Q$cvRisk)\nprint(fit_Q$coef)\nstopifnot(!any(fit_Q$errorsInCVLibrary), !any(fit_Q$errorsInLibrary))\nX1 <- features_Q(rep(1, n), W)\nX0 <- features_Q(rep(0, n), W)\nq1 <- as.numeric(predict(fit_Q, newdata = X1)$pred)\nq0 <- as.numeric(predict(fit_Q, newdata = X0)$pred)\nstopifnot(length(q1) == n, length(q0) == n,\n          all(is.finite(c(q1, q0))),\n          all(c(q1, q0) >= 0 & c(q1, q0) <= 1))\nresult_G <- c(mu1 = mean(q1), mu0 = mean(q0),\n              RD = mean(q1 - q0), truth_given_W = truth_given_W)\nprint(result_G)",
+          "execution": "not-run",
+          "caption": "未运行。mean、GLM与glmnet组成小候选库；二项family对应概率任务，NNLS元学习器的具体约束以包文档为准。"
+        },
+        {
+          "type": "paragraph",
+          "text": "SL.mean给出常数预测基线；SL.glm在二项族下拟合logistic候选；SL.glmnet提供带惩罚的候选，其额外包必须准备好。这里没有把一长串未使用的依赖放进环境，以免不必要的安装问题掩盖核心流程。"
+        },
+        {
+          "type": "paragraph",
+          "text": "fit_Q$cvRisk是各候选的交叉验证风险；fit_Q$coef是组合系数。最低风险候选不必与最高系数一一对应，系数也没有治疗作用大小的含义。包文档明确，cvRisk不包含最终SL整体的独立交叉验证风险。需要整体预测评价时，可增加独立测试集或外层CV.SuperLearner；那仍与下周因果得分的外层交叉拟合职责不同。"
+        },
+        {
+          "type": "paragraph",
+          "text": "predict(fit_Q, ...)$pred是SL组合预测接口，不要把它机械地当作裸glm的线性预测子。使用裸glm预测二元结果时通常需要type=\"response\"；使用任何其他学习器时，都要确认拿到的是概率。A=1和A=0副本保留相同W，因此结果按全样本W分布标准化。"
+        }
+      ]
+    },
+    {
+      "id": "fit-propensity",
+      "title": "学习处理概率与检查权重",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "set.seed(4106)\nfit_e <- SuperLearner::SuperLearner(\n  Y = d$A, X = W, family = binomial(),\n  SL.library = library_names, method = \"method.NNLS\",\n  cvControl = list(V = 5, stratifyCV = TRUE)\n)\nstopifnot(!any(fit_e$errorsInCVLibrary), !any(fit_e$errorsInLibrary))\nehat <- as.numeric(predict(fit_e, newdata = W)$pred)\nstopifnot(length(ehat) == n, all(is.finite(ehat)),\n          all(ehat > 0 & ehat < 1))\nw <- ifelse(d$A == 1, 1 / ehat, 1 / (1 - ehat))\ness <- function(z) sum(z)^2 / sum(z^2)\nprint(tapply(ehat, d$A, quantile, probs = c(0, .01, .5, .99, 1)))\nprint(tapply(w, d$A, quantile, probs = c(0, .5, .95, .99, 1)))\nprint(tapply(w, d$A, ess))\n# 两组概率分布；检查局部支持时还需结合W。\nboxplot(ehat ~ d$A, xlab = \"A\", ylab = \"Estimated propensity\")\nmu1_H <- weighted.mean(d$Y[d$A == 1], w[d$A == 1])\nmu0_H <- weighted.mean(d$Y[d$A == 0], w[d$A == 0])\nRD_H <- mu1_H - mu0_H\n# 固定使用未加权两组方差平均值作SMD分母。\nsmd <- function(x, weights) {\n  idx1 <- d$A == 1; idx0 <- !idx1\n  scale <- sqrt((var(x[idx1]) + var(x[idx0])) / 2)\n  if (scale == 0) return(NA_real_)\n  (weighted.mean(x[idx1], weights[idx1]) -\n   weighted.mean(x[idx0], weights[idx0])) / scale\n}\nbalance <- data.frame(variable = names(W),\n  before = vapply(W, smd, numeric(1), weights = rep(1, n)),\n  after = vapply(W, smd, numeric(1), weights = w))\nprint(balance)\nprint(c(RD_G = result_G[[\"RD\"]], RD_H = RD_H))\n# 二元A、截距、恒等链接的加权回归系数应等于组均值差。\nweighted_fit <- lm(Y ~ A, data = d, weights = w)\nstopifnot(abs(unname(coef(weighted_fit)[\"A\"]) - RD_H) < 1e-10)",
+          "execution": "not-run",
+          "caption": "未运行。为透明教学手算ATE权重与SMD；对零分母直接停止，未悄悄截断或丢弃观察。"
+        },
+        {
+          "type": "paragraph",
+          "text": "处理模型的响应变成A，输入只含W；Y不在处理模型中。若概率等于0或1，代码暂停，要求检查学习器、编码与重叠。实际研究可预先论证截断，但不应把报错后自动改动概率当作无代价修复。"
+        },
+        {
+          "type": "paragraph",
+          "text": "简单SMD只覆盖均值层面的平衡。实际可增加平方项、交互和多类别分布检查；均衡阈值应有清楚的计算定义。boxplot只是起点，还可用直方图、密度图及局部W分组检查处理概率。两个RD接近属于结果检查，无法单独验证识别。"
+        }
+      ]
+    },
+    {
+      "id": "inference-and-record",
+      "title": "不确定性与执行记录",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "上面的lm断言只核验点估计的代数关系。其常规模型标准误不能直接声称已反映估计PS、SL调参和组合选择带来的全部不确定性。同样，软件接受了权重也不意味着它自动理解权重怎样被估计。正式推断要选择对目标估计器、抽样结构和学习器有依据的方案。"
+        },
+        {
+          "type": "paragraph",
+          "text": "如果用bootstrap，应按实际独立抽样单位重抽样，在每次样本中重做所需模型拟合、干预构造和目标平均。只有5次重抽样可以演示循环，不能稳定估计95%分位区间；增加次数只能改善蒙特卡洛精度，仍需论证该bootstrap对自适应学习器的统计有效性。下一周将引入交叉拟合的正交得分推断作为另一条路径。"
+        },
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 运行后保留足够的复查信息；文件不包含真实患者资料。\nrun_record <- list(\n  seed_data = 4104L, seed_Q = 4105L, seed_e = 4106L,\n  folds_Q = fit_Q$validRows, folds_e = fit_e$validRows,\n  learners = library_names, outcome_window = \"30 days (simulation)\",\n  target = \"ATE over the sample covariate distribution\",\n  truncation = \"none\", result_G = result_G,\n  RD_H = RD_H, balance = balance, session = sessionInfo()\n)\nprint(run_record$session)\n# 如需本地保留，可自行选择位置执行 saveRDS(run_record, \"sl_run_record.rds\")",
+          "execution": "not-run",
+          "caption": "未运行。记录seed还不够，包版本、实际折分、特征规则与警告同样影响可复现性。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "练习与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w04-l04-ex1",
+          "prompt": "结果模型有A_severity列。将预测副本的A改成0后，A_severity仍保留原始值。最合适的修正是",
+          "options": [
+            "只把最后的风险差乘以0",
+            "由新的A和相同severity重新生成A_severity",
+            "保持原值以避免改变原始患者",
+            "删去所有高严重程度者"
+          ],
+          "answer": 1,
+          "explanation": "A_severity是A×severity的确定函数。新的干预副本必须让所有依赖A的特征与干预相容。保留原交互会使输入互相矛盾；本课features_Q函数就是为了让这一步可检查。"
+        },
+        {
+          "type": "exercise",
+          "id": "w04-l04-ex2",
+          "prompt": "一次运行得到95%bootstrap区间不跨0，但只用了5个重复。合适的报告方式是",
+          "options": [
+            "直接宣布显著治疗效果",
+            "把5次重复当作流程演示，暂不作正式区间推断",
+            "将区间端点保留更多小数",
+            "换一个更复杂的SL候选即可保证覆盖率"
+          ],
+          "answer": 1,
+          "explanation": "5个数的尾部分位数极不稳定，无法支撑可靠95%区间。更多重抽样能改善数值精度，但仍需检验bootstrap设计及其对该学习估计器的有效性。点估计、识别和区间覆盖要分别说明。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "sl-manual",
+      "title": "SuperLearner: Super Learner Prediction",
+      "authors": "SuperLearner package authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://cran.r-project.org/web/packages/SuperLearner/SuperLearner.pdf",
+      "locator": "SuperLearner, CV.SuperLearner, SuperLearner.CV.control and prediction methods"
+    },
+    {
+      "id": "sl-paper",
+      "title": "Super learner",
+      "authors": "Mark J. van der Laan; Eric C. Polley; Alan E. Hubbard",
+      "year": 2007,
+      "url": "https://pubmed.ncbi.nlm.nih.gov/17910531/",
+      "locator": "Original article, DOI 10.2202/1544-6115.1309: cross-validated ensemble prediction"
+    },
+    {
+      "id": "what-if",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "Chapters 2–3, 12–13: exchangeability, positivity, IP weighting and standardization"
+    }
+  ],
+  "exerciseIds": [
+    "w04-l04-ex1",
+    "w04-l04-ex2"
+  ],
+  "codeStatus": "not-run",
+  "statusNote": "正文、模拟设定与代码静态检查已完成；本课 R 代码尚未实际运行，暂不提供软件输出。"
+}

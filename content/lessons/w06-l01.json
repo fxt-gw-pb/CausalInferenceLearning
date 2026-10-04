@@ -1,0 +1,325 @@
+{
+  "schemaVersion": 1,
+  "id": "w06-l01",
+  "week": 6,
+  "order": 1,
+  "title": "TMLE 的理论基础",
+  "summary": "从 ATE 识别式出发，逐步构造二元结局的 logistic 靶向更新，并分清双重稳健、交叉拟合和推断条件。",
+  "status": "ready",
+  "readingMinutes": 32,
+  "tags": [
+    "初始估计",
+    "巧妙协变量",
+    "靶向更新",
+    "扩展概览"
+  ],
+  "objectives": [
+    "写出 Q、g、H 及合法的概率更新",
+    "解释靶向估计方程与 AIPW 的联系",
+    "分别陈述识别、估计一致性和置信区间的条件",
+    "区分 C-TMLE、交叉拟合与生存结局扩展"
+  ],
+  "prerequisites": [
+    "w05-l01",
+    "w05-l02",
+    "logit 与 expit；条件期望；样本方差"
+  ],
+  "sections": [
+    {
+      "id": "target",
+      "title": "目标参数与初始学习",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "考虑一次二元干预 A、干预前协变量 W 和二元结局 Y。Y=1 表示预先规定的事件。目标是当前人群中的平均风险差 ψ=E[Y(1)−Y(0)]，干预的版本和观察时间均已固定。所有学习器都服务于这个目标；换一个机器学习模型不会补足遗漏的混杂因素。"
+        },
+        {
+          "type": "equation",
+          "text": "Qₐ(w)=E[Y∣A=a,W=w]；g(w)=P(A=1∣W=w)；ψ=E[Q₁(W)−Q₀(W)]。",
+          "caption": "最后一个等号依赖一致性、给定 W 的条件交换性及相关人群中的处理正性。"
+        },
+        {
+          "type": "paragraph",
+          "text": "初始结果模型给每位对象两份预测 Q̂₁(Wᵢ)、Q̂₀(Wᵢ)。直接求差的平均就是标准化估计。预测模型通常以整体预测损失为训练目标；对目标风险差重要的少数区域，可能对整体预测损失贡献很小。TMLE 沿一个与目标参数有关的低维方向更新初始预测，再把更新后的预测代回识别式。"
+        },
+        {
+          "type": "paragraph",
+          "text": "先前的 AIPW 将加权残差直接加到标准化结果上。TMLE 将相关校正写进结果分布，获得代入式估计。对二元结局，合适的 logistic 更新保持每一份预测在 0 与 1 之间。风险差也因此位于 −1 与 1 之间。这个范围约束本身不代表估计偏差一定更小。"
+        }
+      ]
+    },
+    {
+      "id": "fluctuation",
+      "title": "巧妙协变量与 logistic 更新",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "H(A,W)=A/ĝ(W)−(1−A)/(1−ĝ(W))。"
+        },
+        {
+          "type": "paragraph",
+          "text": "H 为处理者提供正的逆处理概率，为对照者提供负的逆对照概率。某种处理很少见的协变量区域会被放大，因为那里对该干预结果的信息稀少。若 ĝ 接近边界，H 仍会很大；靶向更新没有消除弱正性。"
+        },
+        {
+          "type": "equation",
+          "text": "logit Q̂ε(A,W)=logit Q̂(A,W)+εH(A,W)；expit(z)=1/(1+exp(−z))。"
+        },
+        {
+          "type": "paragraph",
+          "text": "拟合时把初始 logit 预测作为固定 offset，只估计 ε；此处不另设自由截距。以二元对数损失为准，最优 ε 的得分方程为 ΣHᵢ(Yᵢ−Q̂ε,ᵢ)=0。固定 offset 的作用是保留初始模型已经学习到的结构，再沿 H 给出的方向校正。完全分离或极端输入可能使有限的最优解不存在，应检查收敛与边界。"
+        },
+        {
+          "type": "equation",
+          "text": "Q̂*₁(W)=expit{logit Q̂₁(W)+ε̂/ĝ(W)}；Q̂*₀(W)=expit{logit Q̂₀(W)−ε̂/(1−ĝ(W))}。"
+        },
+        {
+          "type": "callout",
+          "title": "概率尺度检查",
+          "text": "更新后必须经过 expit。把 logit 更新直接改写成 Q̂*=Q̂+ε̂H 会得到另一种模型，且可能离开概率区间。更新 Q₀ 时也必须从 Q̂₀ 出发。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "example",
+      "title": "八条记录的一次完整更新",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "构造八条独立记录，仅用于算术说明。四人接受处理、四人未接受处理；每人的初始两份风险均为 0.5，ĝ=0.5。处理组有三次事件，对照组有一次事件。所有 H 的绝对值均为 2。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "处理",
+            "记录数",
+            "事件数",
+            "H",
+            "更新风险"
+          ],
+          "rows": [
+            [
+              "A=0",
+              "4",
+              "1",
+              "−2",
+              "0.25"
+            ],
+            [
+              "A=1",
+              "4",
+              "3",
+              "2",
+              "0.75"
+            ]
+          ],
+          "caption": "初始风险差为 0；得分方程的根为 ε̂=log(3)/2。"
+        },
+        {
+          "type": "paragraph",
+          "text": "以 ε̂≈0.549306 代入两条更新式，Q̂*₁=0.75，Q̂*₀=0.25，故 ψ̂=0.50。这里的 0.50 是这八条构造记录上的估计值，不能称为已知的人群真值。如此小的样本也不适合展示正态近似区间的可靠性。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "from math import exp, log\nfrom statistics import mean\nA = [0]*4 + [1]*4\nY = [0,0,0,1,0,1,1,1]\nH = [2 if a else -2 for a in A]\ndef expit(z): return 1/(1+exp(-z))\ndef score(eps):\n    return sum(h*(y-expit(eps*h)) for h,y in zip(H,Y))\nlo, hi = -8.0, 8.0\nfor _ in range(100):\n    mid = (lo+hi)/2\n    if score(mid)>0: lo=mid\n    else: hi=mid\neps=(lo+hi)/2\nq1,q0=expit(2*eps),expit(-2*eps)\npsi=q1-q0\ninfluence=[h*(y-(q1 if a else q0)) for a,y,h in zip(A,Y,H)]\nassert abs(eps-log(3)/2)<1e-10\nassert abs(psi-0.5)<1e-10 and abs(mean(influence))<1e-10\nprint(round(eps,6),round(psi,6),round(mean(influence),10))",
+          "execution": "verified",
+          "caption": "原创数值例子；二分法求解本例一维得分。执行核验只覆盖此算术示例。"
+        }
+      ]
+    },
+    {
+      "id": "inference",
+      "title": "影响函数与推断层次",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "D*(O)=H(A,W){Y−Q*(A,W)}+Q*₁(W)−Q*₀(W)−ψ。"
+        },
+        {
+          "type": "paragraph",
+          "text": "最终参数取 ψ̂=n⁻¹Σ[Q̂*₁(Wᵢ)−Q̂*₀(Wᵢ)]。得分方程使加权残差之和接近 0，代入式定义又使预测差减去 ψ̂ 的平均为 0，因此经验影响函数也被校准为均值接近 0。这解释了同一目标下 TMLE 与影响函数方法的联系。"
+        },
+        {
+          "type": "equation",
+          "text": "SE(ψ̂)≈sqrt{Varₙ(D̂*)/n}；大样本区间为 ψ̂±1.96 SE(ψ̂)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这条标准误公式需要渐近线性、合适的 nuisance 收敛、有限方差和样本结构等条件。采用独立或交叉拟合预测时，一个常用充分方向是 Q 与 g 的 L₂ 误差乘积为 oₚ(n⁻¹ᐟ²)，并有适当正性和一致性。点估计的双重稳健一致性不自动保证所给区间有效；仅一个 nuisance 正确但另一项误差不衰减时，仍需另外核对推断理论。"
+        },
+        {
+          "type": "list",
+          "items": [
+            "识别层：观察数据能否识别目标因果量。未测混杂、干预定义和失访均在这一层。",
+            "估计层：Q 与 g 的模型或学习误差能否得到控制。双重稳健通常是相应条件下的一致性结论。",
+            "推断层：余项、样本分割、相关结构和方差估计是否允许区间近似。聚类数据需要相应的聚类推断。"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dml-bridge",
+      "title": "DML 得分与靶向更新的联系",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "上一周的 DML 使用正交得分与样本外 nuisance 预测。对于二元处理、允许异质性的 IRM 平均效应，其得分具有 AIPW 形式；TMLE 则更新结果模型使相关影响函数方程得到校准。两种构造可以共享一阶效率目标，有限样本表现仍取决于实现与条件。"
+        },
+        {
+          "type": "equation",
+          "text": "IRM：E[Q₁(W)−Q₀(W)+A{Y−Q₁(W)}/g(W)−(1−A){Y−Q₀(W)}/{1−g(W)}−ψ]=0。"
+        },
+        {
+          "type": "paragraph",
+          "text": "部分线性残差回归 PLR 的斜率具有不同含义。若真实条件效应随 W 变化，单一残差斜率通常把 τ(W) 按处理变异 g(W){1−g(W)} 加权。除非有常数效应或其他特殊条件，它不能自动替代总体 ATE。选择 DoubleMLIRM 与 DoubleMLPLR 时应先看目标与模型，不能只依据都用了交叉拟合。"
+        },
+        {
+          "type": "equation",
+          "text": "异质性下的二元处理残差斜率：θ=E[g(W){1−g(W)}τ(W)]/E[g(W){1−g(W)}]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "例如两层各占一半，效应分别为 0 与 1，倾向分别为 0.5 与 0.9。ATE=0.5，残差斜率为 0.09/(0.25+0.09)≈0.2647。处理变化较多的第一层权重更大，说明估计目标发生了变化。"
+        }
+      ]
+    },
+    {
+      "id": "extensions",
+      "title": "几种扩展的不同任务",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "方法",
+            "主要任务",
+            "实现时需额外说明"
+          ],
+          "rows": [
+            [
+              "C-TMLE",
+              "结合靶向结果表现选择处理机制模型的复杂度",
+              "候选 g、逐步更新与选择损失"
+            ],
+            [
+              "CV-TMLE / 交叉拟合",
+              "控制灵活 nuisance 学习引出的过拟合与经验过程问题",
+              "每一折训练、预测、更新和聚合所用的索引"
+            ],
+            [
+              "纵向 TMLE",
+              "处理随时间变化的干预、协变量及删失",
+              "时间顺序、序贯交换性、序贯正性及递归更新"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "C-TMLE 可从一串复杂度逐渐提高的候选 g 出发，为每个候选构造 H 并更新 Q，再用与靶向后结果有关的验证损失选择。这样会关注某个处理模型是否改善目标估计，而不只关注它预测 A 的准确性。协作稳健的理论还要求特定得分和收敛条件，不能简化成两个模型随意错设也一定正确。"
+        },
+        {
+          "type": "paragraph",
+          "text": "Super Learner 内部的交叉验证用于选择或组合预测器。交叉拟合要求被评估观测的 nuisance 预测来自不含它的训练资料。完整 CV-TMLE 还须规定靶向步骤的位置。软件中开启交叉验证初始 Q 的一个开关，不足以说明所有这些步骤都已实现。"
+        },
+        {
+          "type": "paragraph",
+          "text": "一个可审计的分折设计至少要记录：每折训练 Q/g 的对象、在留出对象上的两种干预预测、用哪些留出损失估计波动参数，以及最后平均和计算影响函数的对象。存在按折更新或汇总留出预测后更新等不同实现，应沿用所选算法的完整定义；仅把更新放在训练集，再在验证集求均值并不充分说明已实现 CV-TMLE。"
+        },
+        {
+          "type": "paragraph",
+          "text": "生存扩展常以某一时间点的风险或累计发生率为目标。只有一个事件类型时，生存率 Sₐ(t)=1−Fₐ(t)。存在竞争事件时，总生存率为 1−所有原因累计发生率之和；单个原因的 1−Fₐ,k(t) 通常不等于总生存率。下一节把接口输出、事件方向和尺度逐一对齐。"
+        },
+        {
+          "type": "paragraph",
+          "text": "纵向更新通常从最终结局向前递归：先估计最末时点的条件结局均值，按预设处理/删失干预更新，再把它作为上一个时点的伪结局继续回推，最后对基线人群平均。每一步需要与其历史相匹配的处理和删失概率；这是纵向算法的结构说明，本课不将基线 survtmle 示例冒充完整时变处理实现。"
+        }
+      ]
+    },
+    {
+      "id": "checks",
+      "title": "常见误区与自测",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "把双重稳健写成有限样本无偏，或据此省略重叠诊断。",
+            "把所有二元均值更新都称为 Gaussian 回归，省略损失与链接函数。",
+            "只比较两个方法的 p 值大小，便宣布其中一个方法更有效。",
+            "把预测模型交叉验证、nuisance 交叉拟合与森林 honesty 混用。"
+          ]
+        },
+        {
+          "type": "exercise",
+          "id": "w06-l01-update",
+          "prompt": "Q̂₁=0.8、ĝ=0.2、ε̂=0.1 时，按本节更新后的 Q̂*₁ 应怎样计算？",
+          "options": [
+            "0.8+0.1/0.2=1.3",
+            "expit{logit(0.8)+0.1/0.2}",
+            "expit{0.8+0.1/0.2}"
+          ],
+          "answer": 1,
+          "explanation": "先把初始概率变为 logit，再加 ε̂/ĝ，最后用 expit 返回概率。第一项离开概率区间；第三项把概率误作 log odds。"
+        },
+        {
+          "type": "exercise",
+          "id": "w06-l01-dr",
+          "prompt": "结果模型和处理模型均拟合得很好，仍有一个未测共同原因影响 A 与 Y。最准确的结论是哪一项？",
+          "options": [
+            "TMLE 仍能自动给出因果 ATE",
+            "靶向得分均值为零就足够",
+            "因果识别仍可能失败"
+          ],
+          "answer": 2,
+          "explanation": "双重稳健描述已选统计模型中的 nuisance 误设保护。它不建立条件交换性，也不会创造未测混杂变量的信息。靶向方程是估计层的校准，不是识别检验。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "tmle",
+      "title": "tmle: An R Package for Targeted Maximum Likelihood Estimation",
+      "authors": "Susan Gruber; Mark J. van der Laan",
+      "year": 2012,
+      "url": "https://www.jstatsoft.org/article/view/v051i13",
+      "locator": "单时点处理、更新算法、效应尺度与输出"
+    },
+    {
+      "id": "tmle-manual",
+      "title": "tmle reference manual",
+      "authors": "tmle package authors",
+      "year": "在线手册",
+      "url": "https://cran.r-project.org/web/packages/tmle/tmle.pdf",
+      "locator": "tmle: family, Q.SL.library, g.SL.library, cvQinit, estimates"
+    },
+    {
+      "id": "survtmle",
+      "title": "survtmle: targeted estimation of cumulative incidence",
+      "authors": "David Benkeser; Nima S. Hejazi; survtmle contributors",
+      "year": "在线文档",
+      "url": "https://benkeser.github.io/survtmle/reference/survtmle.html",
+      "locator": "Arguments: ftime/ftype; Value: est/var"
+    },
+    {
+      "id": "doubleml-models",
+      "title": "DoubleML models and scores",
+      "authors": "DoubleML authors",
+      "year": "在线文档",
+      "url": "https://docs.doubleml.org/stable/guide/models.html",
+      "locator": "PLR 与 IRM 的目标及得分"
+    },
+    {
+      "id": "ctmle-foundation",
+      "title": "Collaborative Double Robust Targeted Maximum Likelihood Estimation",
+      "authors": "Mark J. van der Laan; Susan Gruber",
+      "year": 2010,
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC2898626/",
+      "locator": "协作选择处理机制及其条件"
+    }
+  ],
+  "exerciseIds": [
+    "w06-l01-update",
+    "w06-l01-dr"
+  ],
+  "codeStatus": "verified"
+}

@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "id": "w01-l09",
+  "week": 1,
+  "order": 9,
+  "title": "R 数据整理",
+  "summary": "在明确编码和单位的前提下筛行、选列、生成变量与分组，并专门检验阈值和缺失值。",
+  "status": "ready",
+  "readingMinutes": 20,
+  "tags": [
+    "筛选",
+    "选择",
+    "新变量",
+    "分类"
+  ],
+  "objectives": [
+    "区分逻辑与、逻辑或及缺失判断。",
+    "正确换算单位并保留原变量做差异核对。",
+    "检验cut边界和离散变量的重复分位点。"
+  ],
+  "prerequisites": [
+    "w01-l07、w01-l08"
+  ],
+  "sections": [
+    {
+      "id": "operations",
+      "title": "四种整理动作",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "设一份完全合成的登记表含身高、体重、两个资格指标和基础评分。目标是保留满足任一资格的人，选择分析所需列，新增按单位计算的BMI，并把基础评分分组。先分步运行，确认行数和变量类型后再整合。这里的分组只服务于编程练习，不构成医学诊断阈值建议。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "raw <- data.frame(\n  id = 1:6, flag_a = c(1, 0, 1, 0, 1, NA),\n  flag_b = c(0, 1, 1, 0, 0, 1),\n  height_cm = c(170, 160, 180, 165, 175, 168),\n  weight_kg = c(68, 64, 81, 60, 70, 65),\n  score = c(10, 20, 20, 30, 40, 40)\n)\n# 字典：1表示满足，0表示不满足。\nkeep_a <- !is.na(raw$flag_a) & raw$flag_a == 1\nkeep_b <- !is.na(raw$flag_b) & raw$flag_b == 1\nany_flag <- raw[keep_a | keep_b, , drop = FALSE]\nboth_flags <- raw[keep_a & keep_b, , drop = FALSE]\nstopifnot(nrow(any_flag) == 5, nrow(both_flags) == 1)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "逐元素|表示满足任一条件，&表示两者同时满足。第6人flag_a缺失、flag_b=1，已经足以确认满足任一条件；若研究方案要求两个字段都完整，需另外加入完整性条件。不能把未知条件直接当作一个通用的否定事实。"
+        }
+      ]
+    },
+    {
+      "id": "units",
+      "title": "派生变量先过单位检查",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "BMI = 体重（kg） / [身高（cm）/100]²",
+          "caption": "170cm先换成1.70m，再平方。68 / 1.70² ≈ 23.53。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "analysis <- any_flag[c(\"id\", \"height_cm\", \"weight_kg\", \"score\")]\nstopifnot(all(analysis$height_cm > 0), all(analysis$weight_kg > 0))\nanalysis$bmi_calc <- analysis$weight_kg / (analysis$height_cm / 100)^2\nstopifnot(abs(analysis$bmi_calc[analysis$id == 1] - 68/1.7^2) < 1e-12)\nanalysis",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若身高误写为除以10000，再平方，结果会被放大10000倍。只看代码能否运行发现不了这种错误。先选一个人手算，再检查整个派生列的分布，通常比不断修改模型更有效。原表已有bmi时，先另建bmi_calc并比较差异；差异可能来自舍入、测量时间或上游处理，未查明前避免直接覆盖。"
+        }
+      ]
+    },
+    {
+      "id": "cuts",
+      "title": "把等于边界的值写进测试",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "本练习按分数区间分为低于20、20至不足40、至少40。使用cut时显式设right=FALSE，得到左闭右开区间；默认right=TRUE则采用另一套端点归属。文字和代码必须一致。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "test_score <- c(19.9, 20, 39.9, 40, NA)\ngroup <- cut(test_score, breaks = c(-Inf, 20, 40, Inf),\n             right = FALSE, labels = c(\"low\", \"middle\", \"high\"))\nstopifnot(identical(as.character(group),\n                    c(\"low\", \"middle\", \"middle\", \"high\", NA_character_)))\nanalysis$score_group <- cut(analysis$score,\n  breaks = c(-Inf, 20, 40, Inf), right = FALSE,\n  labels = c(\"low\", \"middle\", \"high\"))\ntable(analysis$score_group, useNA = \"ifany\")",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "如果分组后出现NA，应区分原值缺失和不在breaks范围内。加入无穷边界能覆盖所有有限数值，却不能代替合理值域检查。若得到空组，也可能是当前人群根本没有落入该范围的观测；应先核对设计，不要为了凑齐人数随意改阈值。"
+        }
+      ]
+    },
+    {
+      "id": "quantiles",
+      "title": "分位数分组在离散数据中的限制",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "x <- c(0, 0, 0, 0, 0, 1, 1, 2)\nq <- quantile(x, probs = seq(0, 1, by = 0.25), na.rm = TRUE)\nq\nif (anyDuplicated(q)) {\n  message(\"分位点重复：需预先选择合并组或有意义的固定分界。\")\n} else {\n  quartile <- cut(x, breaks = q, include.lowest = TRUE)\n}",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "离散评分会有大量相同值，四分位点可能重合，cut不能把重复切点解释成四个互不重叠区间。可依据研究目的减少组数或使用有实质意义的阈值，并报告实际组数。按排序硬切人数相等会把相同评分分到不同组，若采取这种办法，需要说明其含义及后续影响。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "自测与整理验收",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w01-l09-cut",
+          "prompt": "cut使用breaks=c(-Inf,20,40,Inf)、right=FALSE。40进入哪个区间？",
+          "options": [
+            "[20,40)",
+            "[40,Inf)",
+            "取决于该组人数"
+          ],
+          "answer": 1,
+          "explanation": "right=FALSE采用左闭右开，40属于第三组。给定数值的组别不取决于人数。"
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l09-unit",
+          "prompt": "身高170cm、体重68kg。正确计算应为：",
+          "options": [
+            "68/(170/100)^2",
+            "68/(170/10000)^2",
+            "68/170^2"
+          ],
+          "answer": 0,
+          "explanation": "先把厘米转换为米，再代入kg/m²。两种错误公式仍可能运行，因此需要单位和手算检查。"
+        },
+        {
+          "type": "paragraph",
+          "text": "整理验收：保留原始raw，报告两种筛选的人数、各组频数和缺失数；挑一个边界值、一个缺失值和一个正常值解释去向。最后确认新增列没有改变行的对应关系。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-cut",
+      "title": "R Documentation: cut",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/cut.html",
+      "locator": "right、include.lowest、labels与区间端点"
+    },
+    {
+      "id": "r-logic",
+      "title": "R Documentation: Logic",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/Logic.html",
+      "locator": "逐元素逻辑运算与NA"
+    },
+    {
+      "id": "r-quantile",
+      "title": "R Documentation: quantile",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/quantile.html",
+      "locator": "样本分位数与重复数值"
+    }
+  ],
+  "exerciseIds": [
+    "w01-l09-cut",
+    "w01-l09-unit"
+  ],
+  "codeStatus": "not-run"
+}

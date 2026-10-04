@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "id": "w02-l06",
+  "week": 2,
+  "order": 6,
+  "title": "回归控制混杂：基础操作",
+  "summary": "从事件编码、基线变量和分析样本检查开始，完成一个明确指定模型的回归基础流程。",
+  "status": "ready",
+  "readingMinutes": 21,
+  "tags": [
+    "回归建模",
+    "结果检查"
+  ],
+  "objectives": [
+    "确定模型中的事件、参考组与分析人数。",
+    "解释glm的family、公式和模型对象。",
+    "识别缺失、完全分离和旧输出误读等常见问题。"
+  ],
+  "prerequisites": [
+    "第一周R基础；w02-l01至w02-l03"
+  ],
+  "sections": [
+    {
+      "id": "preflight",
+      "title": "建模前锁定目标和数据定义",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "本课使用新构造的1000人预约提醒数据。A=1为分配提醒，A=0为对照；Y=1为共同30天窗口内失约；W=1为处理前高风险层。所有观察完整，没有重复预约或失访。这个简化设置让我们专注于软件流程，不用不明来源的码值填补研究定义。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "A",
+            "W",
+            "人数",
+            "事件数",
+            "事件比例"
+          ],
+          "rows": [
+            [
+              "0",
+              "0",
+              "400",
+              "80",
+              ".20"
+            ],
+            [
+              "0",
+              "1",
+              "100",
+              "50",
+              ".50"
+            ],
+            [
+              "1",
+              "0",
+              "100",
+              "10",
+              ".10"
+            ],
+            [
+              "1",
+              "1",
+              "400",
+              "120",
+              ".30"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "A=1和A=0各500人，粗事件比例都为26%。两组W构成却不同，因此粗差0不能直接当作处理无效。数据有意设置这种现象，供后续回归与G计算对照。"
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "生成可独立复现的输入",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 原创合成1000人；W为处理前风险层，Y为30天失约。\ncells <- data.frame(A=c(0,0,1,1), W=c(0,1,0,1),\n                    n=c(400,100,100,400), events=c(80,50,10,120))\nd <- do.call(rbind, lapply(seq_len(nrow(cells)), function(j) {\n  z <- cells[j, ]\n  data.frame(A=rep(z$A,z$n), W=rep(z$W,z$n),\n             Y=c(rep(1,z$events),rep(0,z$n-z$events)))\n}))\nrownames(d) <- NULL\nd$id <- seq_len(nrow(d))\nstopifnot(nrow(d)==1000, !anyNA(d), !anyDuplicated(d$id))\nstopifnot(all(d$A %in% c(0,1)), all(d$Y %in% c(0,1)))\nwith(d, table(A, W))\nwith(d, tapply(Y, list(A,W), mean))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "程序按每个格子的事件人数展开为一人一行。id只用于识别观察单位，不进入调整公式。明确变量清单比取数据中某列之前的全部字段安全，后者可能把id、索引或处理后信息意外纳入。"
+        }
+      ]
+    },
+    {
+      "id": "fit",
+      "title": "显式指定二项分布和公式",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 接着使用上一步生成的d。\nfit_crude <- glm(Y ~ A, data=d, family=binomial(link=\"logit\"), na.action=na.fail)\nfit_adjusted <- glm(Y ~ A * W, data=d, family=binomial(link=\"logit\"), na.action=na.fail)\nsummary(fit_adjusted)\nstopifnot(fit_adjusted$converged, nobs(fit_adjusted)==nrow(d),\n          fit_adjusted$family$family == \"binomial\")\ncoef(fit_adjusted)\nmodel.matrix(fit_adjusted)[1:4, , drop=FALSE]",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "Y~A*W展开为Y~A+W+A:W，允许不同W层的处理log-odds对比不同。family=binomial(link=\"logit\")明确结局是二元事件；glm省略family时默认为Gaussian，函数名相同并不会保留前一次模型的分布。na.action=na.fail让意外缺失尽早暴露，本课无缺失所以应通过。"
+        },
+        {
+          "type": "paragraph",
+          "text": "模型对象包含系数、家族、拟合值、收敛状态及模型使用的数据等。summary给出的P值不负责判定W是否是混杂因素；这个调整决定来自我们在分析前设定的结构。"
+        }
+      ]
+    },
+    {
+      "id": "encoding",
+      "title": "数字编码与因子参考水平",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "d$group <- factor(d$A, levels=c(0,1), labels=c(\"usual\",\"reminder\"))\nstopifnot(identical(levels(d$group), c(\"usual\",\"reminder\")))\nfit_factor <- glm(Y ~ group * W, data=d,\n                  family=binomial(), na.action=na.fail)\ncoef(fit_factor)\n# 比较两种表达方式在同一数据上的预测，而非硬猜系数名。\nstopifnot(max(abs(predict(fit_factor,type=\"response\") -\n                  predict(fit_adjusted,type=\"response\"))) < 1e-8)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "把A的0/1显式变为两个命名水平，便于阅读输出。在默认处理对比下usual是参考组。结局本课保留清楚的数值0/1，避免因因子水平先后而误读事件方向。若更换处理参考组，部分系数符号和对比方向会改变，但同一拟合模型对人的风险预测应保持一致。"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "title": "先核对模型，再解释输出",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "样本数：每个模型是否使用相同人数；缺失引起的删行会混入模型比较。",
+            "事件定义：30天失约与全部随访期间失约不是同一结局。",
+            "收敛和分离：某个组合全是0或全是1时，logistic参数可能趋于无穷；警告不能一概忽略。",
+            "公式与输出对象：查看summary(fit_adjusted)是否确实对应刚拟合的对象，不能把屏幕残留的上一模型结果当成新模型。",
+            "时间结局：生存分析中的时间和事件状态共同描述一个终点，需定义时间零点、单位和删失。"
+          ],
+          "ordered": false
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l06-family",
+          "prompt": "复制bootstrap拟合代码时写成glm(Y~A+W,data=b)，遗漏family。默认会发生什么？",
+          "options": [
+            "自动沿用之前的binomial",
+            "默认使用Gaussian",
+            "自动依据Y的0/1选择binomial"
+          ],
+          "answer": 1,
+          "explanation": "glm默认family是gaussian。Y为0/1并不会自动改变默认分布；重拟合时应完整重现模型设定。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l06-formula",
+          "prompt": "A*W在R公式中的含义是：",
+          "options": [
+            "仅A与W相乘的一列",
+            "A、W和A:W交互同时进入",
+            "自动选择更显著的变量"
+          ],
+          "answer": 1,
+          "explanation": "R公式中的*是展开操作。它允许处理对比随W变化，不执行变量筛选。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-glm",
+      "title": "R Documentation: glm",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/glm.html",
+      "locator": "Usage：默认family；Details：A*W展开与响应编码"
+    },
+    {
+      "id": "r-factor",
+      "title": "R Documentation: factor",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/factor.html",
+      "locator": "levels与分类编码"
+    },
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第11章：为何使用模型；第13章：结果模型与标准化"
+    }
+  ],
+  "exerciseIds": [
+    "w02-l06-family",
+    "w02-l06-formula"
+  ],
+  "codeStatus": "not-run"
+}

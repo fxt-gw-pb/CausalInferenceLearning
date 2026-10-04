@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "id": "w01-l10",
+  "week": 1,
+  "order": 10,
+  "title": "管道与分析流程",
+  "summary": "把数据操作连成可读管道，追踪每步对象类型，并用显式参数避免模型调用错位。",
+  "status": "ready",
+  "readingMinutes": 19,
+  "tags": [
+    "管道",
+    "连续数据操作"
+  ],
+  "objectives": [
+    "解释原生管道的默认首参数传递。",
+    "在模型data参数不是首参数时正确传递数据。",
+    "拆开长流程调试，并验证整合前后结果相同。"
+  ],
+  "prerequisites": [
+    "w01-l04至w01-l09；原生管道需R 4.1或更新版本"
+  ],
+  "sections": [
+    {
+      "id": "flow",
+      "title": "管道按数据的去向阅读",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "一个表达式可以从最内层读起，也可以按操作顺序写成管道。c(2,4,6)先求均值，再求平方根，得到2。原生|>把左边结果传入右边函数调用的第一个参数，简单情况下x |> f(y)相当于f(x,y)。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "nested <- sqrt(mean(c(2, 4, 6)))\npiped <- c(2, 4, 6) |> mean() |> sqrt()\nstopifnot(identical(nested, piped), piped == 2)\n# head(3)表示前3项，不是第3项。\nc(2, 4, 6, 8) |> head(3)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "原生管道从R 4.1起可用。%>%来自magrittr，dplyr也会导出它。二者的高级占位规则并不完全相同：data=.属于magrittr常见写法，不能机械搬到原生管道。为减少版本差异，下面在非首参数位置采用显式匿名函数。"
+        }
+      ]
+    },
+    {
+      "id": "steps",
+      "title": "每一步都有输入类型和输出类型",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "d <- data.frame(id = 1:6, age = c(30, 45, 60, 70, 52, 66),\n                score = c(10, 20, 40, 30, 50, 60))\nstep1 <- subset(d, age >= 50)\nstep2 <- step1[, c(\"id\", \"score\"), drop = FALSE]\nstep3 <- step2$score\nstep4 <- mean(step3)\nstopifnot(nrow(step1) == 4, ncol(step2) == 2,\n          length(step3) == 4, step4 == 45)\n\nresult <- d |>\n  subset(age >= 50) |>\n  (function(z) z[, c(\"id\", \"score\"), drop = FALSE])() |>\n  (function(z) z$score)() |>\n  mean()\nstopifnot(identical(result, step4))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "步骤",
+            "结果类型",
+            "本例规模"
+          ],
+          "rows": [
+            [
+              "筛选age≥50",
+              "data.frame",
+              "4行3列"
+            ],
+            [
+              "选择id和score",
+              "data.frame",
+              "4行2列"
+            ],
+            [
+              "取score",
+              "numeric",
+              "长度4"
+            ],
+            [
+              "mean",
+              "numeric",
+              "长度1，值45"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "取出score后，结果已经成为向量；接下来不能再按数据框写结果$score。table和prop.table也会改变输出类型，它们不会自动把频数和比例添加回原始数据。把结果类型写在纸上，是排查管道错误的简便方法。"
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "title": "明确把数据送到模型的data参数",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "lm的第一个参数是formula。若把数据直接送到首参数位置，又在后面写一个公式，参数就可能错位。显式匿名函数接收上一步的数据z，并写data=z，能够清楚地表达意图。此例只演示软件参数传递，不把年龄与评分的关联解释为因果。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "fit <- d |>\n  subset(age >= 45) |>\n  (function(z) lm(score ~ age, data = z))()\ncoef(fit)\nnobs(fit)\nstopifnot(nobs(fit) == 5)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "在magrittr中，常见的等价结构是数据 %>% lm(score ~ age, data=.)，点代表紧邻前一步的输出。带多个点或嵌套表达式时还要阅读其具体规则。入门时先使用明确的中间对象，也完全可以写出可靠分析。"
+        }
+      ]
+    },
+    {
+      "id": "dplyr",
+      "title": "用dplyr表达筛选、变换和汇总",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 可选练习：要求已安装dplyr；本段不会安装包。\nif (!requireNamespace(\"dplyr\", quietly = TRUE)) {\n  stop(\"此可选练习需要dplyr；前面的base R练习不依赖它。\")\n}\nsummary_table <- d |>\n  dplyr::filter(age >= 50) |>\n  dplyr::mutate(group = ifelse(score >= 40, \"high\", \"lower\")) |>\n  dplyr::count(group, name = \"n\") |>\n  dplyr::mutate(proportion = n / sum(n))\nsummary_table\nstopifnot(sum(summary_table$n) == 4,\n          abs(sum(summary_table$proportion) - 1) < 1e-12)",
+          "caption": "原创可选R代码；当前未执行，dplyr依赖未安装或检查。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例高分组有3人，占75%，较低分组1人，占25%。mutate使用已有列名会替换该列，因此派生变量建议使用新名字。filter只保留条件为TRUE的行，涉及NA时要先明确预期行为。管道缩短了写法，并没有取消任何数据含义和缺失处理的决定。"
+        }
+      ]
+    },
+    {
+      "id": "debug",
+      "title": "按最小步骤定位错误",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "先运行创建输入的代码，核对dim、names和str。",
+            "一次只增加一个函数，确认输入类型与参数位置。",
+            "出现错误或警告时先停止读后续结果，避免使用残留旧对象。",
+            "完整运行后与分步结果比较，再保存脚本与版本记录。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l10-type",
+          "prompt": "流程已经执行到d$score，下一步可以直接使用：",
+          "options": [
+            "mean()",
+            "dplyr::select(id)",
+            "结果$score"
+          ],
+          "answer": 0,
+          "explanation": "d$score已经是数值向量，mean可以接收。select和$取列需要相应的表格或列表结构。"
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l10-data",
+          "prompt": "原生管道把数据传给lm时，最清楚的写法是：",
+          "options": [
+            "数据 |> lm(score ~ age, data=.)",
+            "数据 |> (function(z) lm(score ~ age, data=z))()",
+            "数据 |> lm(data=)"
+          ],
+          "answer": 1,
+          "explanation": "匿名函数明确接住左侧数据，再放入data参数。data=.依赖另一种管道的占位规则，缺省data=也不表达正确传递。"
+        },
+        {
+          "type": "paragraph",
+          "text": "周末综合练习：从本周自造的六人表开始，完成资格筛选、变量选择、单位换算、边界明确的分组、频数及比例。先交付分步版，再交付管道版，并用stopifnot验证一致。能解释每一步的单位、人群和类型，就具备进入回归实操的基础。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-pipeOp",
+      "title": "R Documentation: pipeOp",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/pipeOp.html",
+      "locator": "默认首参数和匿名函数的非首参数示例"
+    },
+    {
+      "id": "magrittr-pipe",
+      "title": "magrittr: Pipe",
+      "authors": "magrittr authors",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://magrittr.tidyverse.org/reference/pipe.html",
+      "locator": "参数占位符和嵌套规则"
+    },
+    {
+      "id": "dplyr-filter",
+      "title": "dplyr: filter",
+      "authors": "dplyr authors",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://dplyr.tidyverse.org/reference/filter.html",
+      "locator": "条件为TRUE与NA的处理"
+    }
+  ],
+  "exerciseIds": [
+    "w01-l10-type",
+    "w01-l10-data"
+  ],
+  "codeStatus": "not-run"
+}

@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "id": "w01-l06",
+  "week": 1,
+  "order": 6,
+  "title": "数据导入与导出",
+  "summary": "把读入、字典核对、导出与回读连成一个可验收流程，避免路径、缺失编码和版本变化悄悄进入分析。",
+  "status": "ready",
+  "readingMinutes": 18,
+  "tags": [
+    "文件读取",
+    "变量类型",
+    "数据检查"
+  ],
+  "objectives": [
+    "区分工作目录、文件位置与会话对象。",
+    "检查导入后行列数、码值和缺失情况。",
+    "通过临时CSV往返检验导出参数。"
+  ],
+  "prerequisites": [
+    "w01-l04、w01-l05"
+  ],
+  "sections": [
+    {
+      "id": "paths",
+      "title": "文件位置与R对象分开管理",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "read.csv读取磁盘内容并返回对象；修改该对象不会自动改写原文件。write.csv才会把当前对象写到指定文件。相对路径以getwd()返回的工作目录为起点，绝对路径则明确完整位置。Files面板浏览到某个目录，也不一定意味着工作目录已改变。"
+        },
+        {
+          "type": "paragraph",
+          "text": "项目中可以保留原始输入、处理脚本和输出三个清楚分开的区域。无需在每台电脑上复制相同的私人目录；使用项目相对路径或file.path()更便于迁移。Windows字符串中的反斜杠需要转义，正斜杠通常更容易书写。setwd()不创建目录，dir.create()才负责创建。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "getwd()\nfile.path(\"data\", \"appointments.csv\")\n# 有真实文件时先检查，再读入：\n# path <- file.path(\"data\", \"appointments.csv\")\n# stopifnot(file.exists(path))\n# d <- read.csv(path, na.strings = c(\"\", \"NA\"),\n#               stringsAsFactors = FALSE, check.names = FALSE)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        }
+      ]
+    },
+    {
+      "id": "import",
+      "title": "先用四行CSV练习读取",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "csv_text <- paste(\n  \"id,A,baseline_score,Y\",\n  \"p01,0,2,1\",\n  \"p02,1,5,0\",\n  \"p03,1,NA,0\",\n  \"p04,0,3,1\",\n  sep = \"\n\"\n)\nd <- read.csv(text = csv_text, na.strings = c(\"\", \"NA\"),\n              stringsAsFactors = FALSE)\nstopifnot(nrow(d) == 4, ncol(d) == 4,\n          identical(names(d), c(\"id\", \"A\", \"baseline_score\", \"Y\")))\nstr(d)\ncolSums(is.na(d))\ntable(d$A, useNA = \"ifany\")",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例第三人的baseline_score是缺失。read.csv默认认为第一行为表头；read.table的默认参数不同。文件扩展名只是线索，实际读取还取决于分隔符、表头、引号、小数点和缺失标记。若导入只出现一列长字符串，先检查分隔符，不要直接拆分或强制转数值。"
+        },
+        {
+          "type": "paragraph",
+          "text": "控制台省略若干行通常只是打印限制，可以用nrow()检查实际读入多少行。只看head()无法确认全列的范围或缺失，完整检查需使用summary、table、is.na及重复键检查。"
+        }
+      ]
+    },
+    {
+      "id": "dictionary",
+      "title": "数据字典是分析的合同",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "字段",
+            "本例定义",
+            "验收"
+          ],
+          "rows": [
+            [
+              "id",
+              "匿名预约者编号，一行一人",
+              "非空且无重复"
+            ],
+            [
+              "A",
+              "0=不发送，1=发送规定短信",
+              "仅0/1，无额外码值"
+            ],
+            [
+              "baseline_score",
+              "分配短信前测量的困难评分",
+              "单位、范围及缺失规则明确"
+            ],
+            [
+              "Y",
+              "30天窗口内失约，1=是，0=否",
+              "随访完整；未观察到不能随意记0"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "如果字典写0/1，数据却只有1/2，先暂停赋予标签。两个版本的行数、变量数或码值不同也需要追溯原因，不能仅凭文件同名就视为同一份数据。把1猜成有、2猜成无，即使后面代码运行顺利，结论方向仍可能颠倒。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "stopifnot(!anyNA(d$id), !anyDuplicated(d$id))\nstopifnot(all(d$A %in% c(0, 1)), all(d$Y %in% c(0, 1)))\nsummary(d$baseline_score)\n# 若需要完整病例，先记录损失，再另建对象。\ncc <- complete.cases(d[c(\"A\", \"Y\", \"baseline_score\")])\nc(n_total = nrow(d), n_complete = sum(cc), n_incomplete = sum(!cc))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "callout",
+          "title": "完整病例不一定无偏",
+          "text": "缺失值处理会改变分析人群。删除缺失行前，应记录删去人数和原因；缺失机制以及合适方法留到第七周进一步讨论。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "roundtrip",
+      "title": "导出后读回，检查内容没有改变",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 本代码接着运行本页先前的d；只写一个新临时文件。\npath_out <- tempfile(fileext = \".csv\")\nwrite.csv(d, path_out, row.names = FALSE, na = \"NA\",\n          fileEncoding = \"UTF-8\")\nback <- read.csv(path_out, na.strings = \"NA\",\n                 stringsAsFactors = FALSE, fileEncoding = \"UTF-8\")\nstopifnot(identical(names(back), names(d)), nrow(back) == nrow(d))\nstopifnot(identical(back$id, d$id), identical(is.na(back), is.na(d)))\nstopifnot(isTRUE(all.equal(back$baseline_score, d$baseline_score)))\npath_out",
+          "caption": "原创base R往返练习；当前未执行。文件写入R为本次练习新分配的临时位置，不覆盖输入。"
+        },
+        {
+          "type": "paragraph",
+          "text": "row.names=FALSE避免额外导出行名列；na=\"NA\"明确使用字面NA作为缺失标记。若写成na=\"\"，文件中就是空字段，读回规则要同步。CSV并不完整保存因子水平、日期类等R属性，重新读取后应依据字典重建。需要保留R对象结构时，可另了解saveRDS/readRDS，但也要记录来源和版本。"
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "自测与验收",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w01-l06-version",
+          "prompt": "两个同名CSV，一个5000行20列，另一个4800行22列。适当做法是：",
+          "options": [
+            "把较新的文件当作已清洗正确版本",
+            "先核对版本、筛选和派生历史，再决定使用哪一份",
+            "直接复制旧版类别标签到新版"
+          ],
+          "answer": 1,
+          "explanation": "维度变化可能来自筛选、重编码或变量增加。文件名和时间戳无法独立解释变化；需核对数据生成或清洗记录。"
+        },
+        {
+          "type": "exercise",
+          "id": "w01-l06-export",
+          "prompt": "write.csv(..., na=\"\")会怎样保存缺失值？",
+          "options": [
+            "写入一个空字段",
+            "写入一个空格字符",
+            "总是写入三个字符NA"
+          ],
+          "answer": 0,
+          "explanation": "空字符串与空格、字面NA不同。回读参数应与导出约定一致，并通过缺失位置比较确认。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-read.table",
+      "title": "R Documentation: read.table",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/utils/html/read.table.html",
+      "locator": "Usage与Arguments：read.csv、header、na.strings、row.names"
+    },
+    {
+      "id": "r-write.table",
+      "title": "R Documentation: write.table",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/utils/html/write.table.html",
+      "locator": "write.csv、row.names与na"
+    },
+    {
+      "id": "r-getwd",
+      "title": "R Documentation: getwd",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/base/html/getwd.html",
+      "locator": "工作目录的定义"
+    }
+  ],
+  "exerciseIds": [
+    "w01-l06-version",
+    "w01-l06-export"
+  ],
+  "codeStatus": "not-run"
+}

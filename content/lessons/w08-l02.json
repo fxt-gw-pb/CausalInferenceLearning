@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "id": "w08-l02",
+  "week": 8,
+  "order": 2,
+  "title": "因果中介的软件实现",
+  "summary": "从四格反事实风险建立软件对照；用原创 R 代码讲解 g 计算，统一自然效应的参照状态、联合推断和敏感性尺度。",
+  "status": "ready",
+  "readingMinutes": 29,
+  "tags": [
+    "目标与尺度",
+    "联合不确定性",
+    "敏感性分析"
+  ],
+  "objectives": [
+    "把软件字段映射到自然效应定义",
+    "实现二元中介的逐人积分与总体平均",
+    "传播直接/间接效应的联合不确定性",
+    "识别风险差指数化、OR 当 RR 和中介比例的解释错误"
+  ],
+  "prerequisites": [
+    "w08-l01",
+    "R glm/predict；bootstrap；协方差"
+  ],
+  "sections": [
+    {
+      "id": "comparison",
+      "title": "先统一目标再比较软件",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "开始前写一张规格表：A 的两个水平、M 的定义与采集时间、Y 的方向与时间窗口、W 的调整依据、目标人群、效应尺度和所用自然效应配对。算法只在这些内容一致时具有可比较性。下面的示例全部使用原创模拟，不引入真实个体资料。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "工具",
+            "典型任务",
+            "需核查的输出"
+          ],
+          "rows": [
+            [
+              "mediation",
+              "基于中介与结果模型模拟反事实效应",
+              "d0/d1、z0/z1、tau.coef、平均版本及区间"
+            ],
+            [
+              "CMAverse",
+              "多种中介识别和估计框架",
+              "model、结果链接、差值/比值尺度、效应名称"
+            ],
+            [
+              "medoutcon",
+              "自然或干预型直接/间接效应的半参数估计",
+              "Z 的角色、effect、estimator、全部 nuisance 学习器"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "二元 Y 下，mediation 的效应对比通常是结局概率差。CMAverse 的特定 logit 自然效应模型可能报告 OR 尺度；必须读取当前模型的实际输出标签。medoutcon 的自然与干预型效应取决于数据结构与目标，不能只因函数同名便当作同一个估计问题。"
+        }
+      ]
+    },
+    {
+      "id": "gcomp",
+      "title": "原创模拟与中介 g 计算",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# R 未执行。模拟的 W 在 A 之前、M 在 A 之后、Y 在 M 之后。\nset.seed(802)\nn <- 1500L\nW <- rnorm(n)\nA <- rbinom(n,1,plogis(0.3*W))\nM <- rbinom(n,1,plogis(0.2-0.6*A+0.4*W))\nY <- rbinom(n,1,plogis(-1-0.25*A+0.7*M+0.2*A*M+0.5*W))\nd <- data.frame(W=W,A=A,M=M,Y=Y)\nestimate_mu <- function(dat) {\n  mf <- glm(M ~ A+W,data=dat,family=binomial())\n  yf <- glm(Y ~ A*M+W,data=dat,family=binomial())\n  stopifnot(isTRUE(mf$converged),isTRUE(yf$converged))\n  one_mu <- function(a,b) {\n    md <- transform(dat,A=b)\n    pm <- predict(mf,newdata=md,type=\"response\")\n    q0 <- predict(yf,newdata=transform(dat,A=a,M=0),type=\"response\")\n    q1 <- predict(yf,newdata=transform(dat,A=a,M=1),type=\"response\")\n    mean(q0*(1-pm)+q1*pm)\n  }\n  mu <- c(m00=one_mu(0,0),m10=one_mu(1,0),\n          m01=one_mu(0,1),m11=one_mu(1,1))\n  out <- c(PNDE=unname(mu[\"m10\"]-mu[\"m00\"]),\n           TNIE=unname(mu[\"m11\"]-mu[\"m10\"]),\n           TE=unname(mu[\"m11\"]-mu[\"m00\"]))\n  stopifnot(all(is.finite(out)),abs(out[1]+out[2]-out[3])<1e-10)\n  out\n}\nestimate_mu(d)",
+          "execution": "not-run",
+          "caption": "完整的原创二元中介 g 计算结构；R 未执行，未报告拟合结果。"
+        },
+        {
+          "type": "paragraph",
+          "text": "每人的 W 保持原值，one_mu(a,b) 只改变干预和中介的设定。中介模型预测 b 世界的 M=1 概率；结果模型在 a 世界分别预测 M=0 和 M=1 的风险。逐人加权再平均相当于离散中介积分。交互 A×M 被明确放入结果模型，因此两个参照状态的间接效应不必相等。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这段代码的模型族与模拟机制对应，便于理解结构。真实数据需要更充分的模型检查、支持诊断与敏感性分析。若 M 连续，不能仅替换为 predict 得到的一个均值；需要对完整条件分布积分或模拟。"
+        }
+      ]
+    },
+    {
+      "id": "software-map",
+      "title": "mediation 字段的对应关系",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 继续使用上一块 d；需预先配置 mediation。R 未运行。\nstopifnot(requireNamespace(\"mediation\",quietly=TRUE))\nfit_m <- glm(M ~ A+W,data=d,family=binomial())\nfit_y <- glm(Y ~ A*M+W,data=d,family=binomial())\nset.seed(803)\nmed <- mediation::mediate(fit_m,fit_y,treat=\"A\",mediator=\"M\",\n    control.value=0,treat.value=1,boot=TRUE,sims=500)\nc(PNIE=med$d0,TNIE=med$d1,PNDE=med$z0,TNDE=med$z1,\n  TE=med$tau.coef)\nsummary(med)",
+          "execution": "not-run",
+          "caption": "使用 bootstrap 的代码讲解；不另外声称 robustSE 已被应用。R 未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例应核对 z0+d1 与 tau.coef，以及 z1+d0 与 tau.coef 的配对。软件平均版本通常又是两个参照状态的平均，报告时必须注明。若不同模型、抽样步骤或数值模拟使分解偏离预期，应检查实现和 Monte Carlo 精度，不能挑一组看起来好看的结果。"
+        },
+        {
+          "type": "paragraph",
+          "text": "在 CMAverse 中，需要同时核查 model 分支、回归链接、估计方法及输出尺度。OR=0.70 表示优势为参照的 0.70 倍，不能直接解释为风险降低 30%。medoutcon 中仅设置部分学习器，也不等于所有 nuisance 都采用同一种回归；应查完全部接口与版本。"
+        }
+      ]
+    },
+    {
+      "id": "joint-inference",
+      "title": "总效应的联合不确定性",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "Var(PNDE+TNIE)=Var(PNDE)+Var(TNIE)+2Cov(PNDE,TNIE)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "直接和间接效应来自同一批人和相同模型，通常有关联。设二者方差为 0.0004 与 0.0009，协方差为 −0.0002，则总效应方差为 0.0009，标准误为 0.03。忽略协方差会得到 sqrt(0.0013)≈0.0361。正协方差则会产生相反的误差方向。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "from math import sqrt\nv_direct=0.0004\nv_indirect=0.0009\ncov=-0.0002\nv_total=v_direct+v_indirect+2*cov\nassert abs(v_total-0.0009)<1e-12\nprint(sqrt(v_total),sqrt(v_direct+v_indirect))",
+          "execution": "verified",
+          "caption": "原创协方差算例，已执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "普通独立记录下，一个直观办法是对每个 bootstrap 样本同时重新拟合中介与结果模型，再从同一轮结果计算 PNDE、TNIE、TE，保留它们的联合抽样变动。聚类资料应在适当层级重采样；有复杂抽样、边界或非规则估计器时需另用相应方法。增加重复次数只减少 bootstrap 的数值误差，不会修复识别。"
+        },
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 延续 estimate_mu()；R 未执行。只示范独立记录的共同重采样。\nset.seed(804)\nB <- 399L\nboot_est <- replicate(B, {\n  idx <- sample.int(nrow(d),replace=TRUE)\n  estimate_mu(d[idx,,drop=FALSE])\n})\nstopifnot(all(is.finite(boot_est)))\njoint_cov <- cov(t(boot_est))\nsqrt(diag(joint_cov))\napply(boot_est,1,quantile,probs=c(0.025,0.975))",
+          "execution": "not-run",
+          "caption": "R 未执行。正式运行须检查分离、收敛、失败重复和重采样单位，不能静默忽略警告。"
+        }
+      ]
+    },
+    {
+      "id": "scale-sensitivity",
+      "title": "效应尺度、中介比例与敏感性",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "若间接效应是风险差 −0.04，exp(−0.04)≈0.961 只是对一个差值做了数学变换，没有因此获得风险比。即使知道总风险差 −0.06，基线风险 0.10 与 0.50 分别对应 RR=0.40 与 0.88，说明差值本身不足以确定 RR。"
+        },
+        {
+          "type": "paragraph",
+          "text": "风险比尺度的自然效应也可分解：μ11/μ00=(μ10/μ00)×(μ11/μ10)，前提是分母为正。它使用四格风险的比值；不能用风险差指数化替代。OR 尺度要从各风险的优势构造相应比值，并清楚说明解释。"
+        },
+        {
+          "type": "paragraph",
+          "text": "比例中介 PM=间接效应/总效应 只有在尺度、参照状态和配对一致时才有明确含义。总效应接近零时比例会极不稳定；直接与间接方向相反时比例可能小于 0 或大于 1。它不能读作某个机制被证实的概率，也不能只挑最接近 50% 的数报告。"
+        },
+        {
+          "type": "paragraph",
+          "text": "E-value 的经典解释基于风险比尺度的未测混杂关联强度。用于中介路径还需匹配相应中介敏感性框架及假设。将概率差指数化后直接传入 RR 公式，或把常见结局下的 OR 无说明地当 RR，会错误定义输入。识别威胁也可能来自时间顺序、测量误差、选择或处理诱导的中介混杂，单一敏感性数字不覆盖所有问题。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w08-l02-exp",
+          "prompt": "mediation 输出 ACME=−0.05（概率差）。为了输入风险比敏感性公式，最合理的做法是什么？",
+          "options": [
+            "计算 exp(−0.05) 即可",
+            "核对目标与所需尺度，取得相应风险或采用匹配该目标的敏感性方法",
+            "把 −0.05 的绝对值当 RR"
+          ],
+          "answer": 1,
+          "explanation": "概率差不是 log RR。一个差值可对应许多不同风险比。先核对敏感性方法的目标、输入和识别假设，不能靠指数化改变其含义。"
+        },
+        {
+          "type": "exercise",
+          "id": "w08-l02-joint",
+          "prompt": "每轮 bootstrap 只保存 PNDE，另一套独立重采样保存 TNIE，再随机相加。会丢失什么？",
+          "options": [
+            "直接和间接估计之间的协方差",
+            "样本量单位",
+            "处理的 0/1 编码"
+          ],
+          "answer": 0,
+          "explanation": "两项估计在同一数据中相关。共同重采样并在同一轮计算两项和总效应，才能保留这种关联；独立拼接会破坏联合结构。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "mediation-identification",
+      "title": "Identification, Inference and Sensitivity Analysis for Causal Mediation Effects",
+      "authors": "Kosuke Imai; Luke Keele; Teppei Yamamoto",
+      "year": 2010,
+      "url": "https://doi.org/10.1214/10-STS321",
+      "locator": "第3节定义与识别；第5节敏感性分析"
+    },
+    {
+      "id": "mediation-software",
+      "title": "mediation: R Package for Causal Mediation Analysis",
+      "authors": "Dustin Tingley; Teppei Yamamoto; Kentaro Hirose; Luke Keele; Kosuke Imai",
+      "year": 2014,
+      "url": "https://www.jstatsoft.org/article/view/v059i05",
+      "locator": "模型式中介估计与效应参照状态"
+    },
+    {
+      "id": "cmaverse",
+      "title": "Causal Mediation Analysis: cmest",
+      "authors": "CMAverse authors",
+      "year": "在线文档",
+      "url": "https://bs1125.github.io/CMAverse/reference/cmest.html",
+      "locator": "model, estimation, inference, effect definitions"
+    },
+    {
+      "id": "medoutcon",
+      "title": "Efficient estimation of natural and interventional (in)direct effects",
+      "authors": "Nima S. Hejazi; Iván Díaz; medoutcon contributors",
+      "year": "在线文档",
+      "url": "https://codex.nimahejazi.org/medoutcon/reference/medoutcon.html",
+      "locator": "自然与干预型效应、Z、estimator 与 nuisance learners"
+    },
+    {
+      "id": "e-value",
+      "title": "Sensitivity Analysis in Observational Research: Introducing the E-Value",
+      "authors": "Tyler J. VanderWeele; Peng Ding",
+      "year": 2017,
+      "url": "https://doi.org/10.7326/M16-2607",
+      "locator": "风险比尺度的未测混杂敏感性解释"
+    }
+  ],
+  "exerciseIds": [
+    "w08-l02-exp",
+    "w08-l02-joint"
+  ],
+  "codeStatus": "not-run"
+}

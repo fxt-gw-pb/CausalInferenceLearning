@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "id": "w09-l03",
+  "week": 9,
+  "order": 3,
+  "title": "因果森林",
+  "summary": "从树的局部分组走向森林权重和残差矩条件，解释 honesty、样本外预测、方差估计与解释图的边界。",
+  "status": "ready",
+  "readingMinutes": 27,
+  "tags": [
+    "异质性分裂",
+    "honesty",
+    "样本外预测",
+    "推断"
+  ],
+  "objectives": [
+    "说明因果树分裂与结果预测树的目标差异",
+    "解释森林邻域权重与局部残差估计",
+    "区分 honesty、OOB、交叉拟合和验证集",
+    "正确解释变量重要性、PDP 及不确定带"
+  ],
+  "prerequisites": [
+    "w09-l01",
+    "w09-l02",
+    "随机森林基本思想"
+  ],
+  "sections": [
+    {
+      "id": "from-tree",
+      "title": "从结果树到效应树",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "普通回归树寻找让 Y 更容易预测的切分。一个变量即使强烈预测基线结果，也可能完全不修饰处理效应。因果树和因果森林则以处理效应差异或相应局部矩条件为目标组织切分，使特征空间中可能具有相近效应的人彼此更接近。"
+        },
+        {
+          "type": "paragraph",
+          "text": "单棵树的分界不稳定，森林通过多棵随机化树聚合，形成更平滑的局部估计。能否给出有效推断，依赖具体算法、抽样方式、正性、平滑性和正则条件。不能从树很多这一点推导出无偏或有效置信区间。"
+        }
+      ]
+    },
+    {
+      "id": "honesty",
+      "title": "样本使用规则",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "规则",
+            "分开什么",
+            "目的"
+          ],
+          "rows": [
+            [
+              "honesty",
+              "选择切分结构的样本与估叶节点效应的样本",
+              "减少同一噪声既选组又估组效应的适应性偏差"
+            ],
+            [
+              "OOB",
+              "某人未被抽入的树与其自身记录",
+              "生成不使用该人参与这些树训练的预测"
+            ],
+            [
+              "nuisance 交叉拟合",
+              "学习 m/e 的资料与评估残差/得分的资料",
+              "控制 nuisance 过拟合影响"
+            ],
+            [
+              "独立发现/评估",
+              "选择最终分组规则的资料与估组效应的资料",
+              "避免结果驱动选组污染确认性推断"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "这些规则可以配合使用，彼此不能替代。honesty 切分的是观察样本，不是把一半变量用于训练、一半变量用于估计。对同一全样本做 OOB 预测，再按这些预测排序选取最极端的亚组，仍需要为这个选择与推断过程专门论证。"
+        },
+        {
+          "type": "paragraph",
+          "text": "grf 的基本建树使用无放回子抽样；它与教科书式有放回 bootstrap 随机森林的描述应区分。sample.fraction 和 honesty.fraction 影响每棵树可用于分裂与叶节点估计的有效资料量。"
+        }
+      ]
+    },
+    {
+      "id": "weights",
+      "title": "局部森林权重与残差矩条件",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "αᵢ(x)=(1/B)Σᵦ I{i∈Iᵦ,est} I{Xᵢ 与 x 位于树 b 的同一叶节点}/该叶节点估计样本数。"
+        },
+        {
+          "type": "paragraph",
+          "text": "Iᵦ,est 表示树 b 的估计样本索引集合。把同一叶节点中的估计对象看作查询点 x 的邻居，再跨树平均，就得到自适应邻域权重。不同森林实现对空叶、抽样和预测细节各有规则；上式用于说明非空估计叶的直观结构。相关权重非负，通常归一为总和 1。"
+        },
+        {
+          "type": "equation",
+          "text": "Σᵢαᵢ(x){Aᵢ−ê(Xᵢ)}[Yᵢ−m̂(Xᵢ)−τ̂(x){Aᵢ−ê(Xᵢ)}]≈0。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这是简化的局部残差矩条件。它将前一节的正交残差思想放入森林确定的邻域。实际广义随机森林还会处理局部截距、分裂近似、样本权重和方差等细节，应以具体实现为准。未经调整的叶节点处理/对照均值差，在观察性资料中仍可能受混杂影响。"
+        },
+        {
+          "type": "paragraph",
+          "text": "构造四个邻居，α=(0.1,0.2,0.3,0.4)，处理残差 v=(−0.5,0.5,−0.5,0.5)，结果残差 u=2v。此局部矩条件的斜率为 Σαvu/Σαv²=2。这是已给定邻域后的估计算术，没有运行建树过程。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "alpha=[0.1,0.2,0.3,0.4]\nv=[-0.5,0.5,-0.5,0.5]\nu=[2*x for x in v]\ndenom=sum(w*x*x for w,x in zip(alpha,v))\ntau=sum(w*x*y for w,x,y in zip(alpha,v,u))/denom\nmoment=sum(w*x*(y-tau*x) for w,x,y in zip(alpha,v,u))\nassert abs(sum(alpha)-1)<1e-12\nassert abs(tau-2)<1e-12 and abs(moment)<1e-12\nprint(tau,moment)",
+          "execution": "verified",
+          "caption": "原创局部矩条件核验，已执行；不是森林训练结果。"
+        }
+      ]
+    },
+    {
+      "id": "r-structure",
+      "title": "grf 接口的最小代码讲解",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# R 未执行。模拟随机处理与连续结果，便于明确已知倾向概率。\nstopifnot(requireNamespace(\"grf\",quietly=TRUE))\nset.seed(903)\nn <- 1500L\nX <- cbind(x1=runif(n,-1,1),x2=rnorm(n))\nA <- rbinom(n,1,0.5)\ntau_true <- 0.5+X[,\"x1\"]\nY <- X[,\"x2\"]+A*tau_true+rnorm(n)\nforest <- grf::causal_forest(X=X,Y=Y,W=A,W.hat=rep(0.5,n),\n    num.trees=2000,honesty=TRUE,sample.fraction=0.5,seed=904)\noob <- predict(forest)$predictions\nnewx <- matrix(c(-0.5,0,0.5,0),nrow=2,byrow=TRUE,\n               dimnames=list(NULL,colnames(X)))\nnewpred <- predict(forest,newdata=newx,estimate.variance=TRUE)\nnewpred$predictions\nnewpred$variance.estimates\ngrf::variable_importance(forest)",
+          "execution": "not-run",
+          "caption": "grf 参数 W 表示处理变量，本节因果记号中的 W/X 则表示协变量；输入时须分清。R 未运行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "此例因随机处理已知 e=0.5，明确传入 W.hat。观察性分析应以足够基线变量估计 e，并核对 nuisance 的样本使用方案。因果森林直接估计条件处理效应；AIPW/TMLE 中预测 Q 或 g 时，应选相应结果/概率学习器，不能不加转换地用 causal_forest 对象替换任意监督预测器。"
+        }
+      ]
+    },
+    {
+      "id": "uncertainty",
+      "title": "方差、预测分布与解释图",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "树彼此共享资料且相关，树预测值的方差除以树数一般不等于 τ̂(x) 的采样方差。应使用该森林实现对应的方差方法，并核对样本量、树数和算法条件。点态置信区间也不自动成为整条 CATE 曲线的同时置信带。"
+        },
+        {
+          "type": "paragraph",
+          "text": "grf 的 variable_importance 是按树深度加权的分裂次数指标。变量被频繁使用，说明它在该拟合中有助于分区；这不自动证明它本身的因果作用或效应修饰显著。相关变量还可能相互替代。"
+        },
+        {
+          "type": "equation",
+          "text": "PDPⱼ(z)=(1/n)Σᵢτ̂(z,Xᵢ,−ⱼ)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "PDP 用固定 z 后的预测描述模型函数。若这样替换产生现实中不存在的协变量组合，就会依赖外推。每个 z 下把全体预测取 2.5% 与 97.5% 分位，得到的是预测值在人群中的离散带；它通常不等于平均 PDP 的 95% 置信区间。后者需要传播模型与抽样误差。SHAP 也解释选定预测函数和参考分布，不能直接解释为干预该协变量的因果效应。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w09-l03-honesty",
+          "prompt": "honesty 通常把什么分开？",
+          "options": [
+            "一半基线变量和另一半基线变量",
+            "选择树结构的对象与估计叶节点效应的对象",
+            "所有处理者与所有对照者"
+          ],
+          "answer": 1,
+          "explanation": "honesty 控制同一观测既影响切分选择又估该叶效应的适应性偏差。每一部分仍需要合适的处理/对照支持；它不等于分变量或把两处理组完全隔开。"
+        },
+        {
+          "type": "exercise",
+          "id": "w09-l03-band",
+          "prompt": "固定年龄值后，对全体人的预测 CATE 取 2.5% 和 97.5% 分位。这条带最恰当的名称是什么？",
+          "options": [
+            "平均 PDP 的已验证 95% 置信带",
+            "人群预测分位带",
+            "个体真实因果效应的识别区间"
+          ],
+          "answer": 1,
+          "explanation": "这里的变化来自其他协变量在人群中的差异以及已拟合函数，没有重复估计模型以量化其采样不确定性。它也不能识别每人的两个潜在结局。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "causal-forest",
+      "title": "Estimation and Inference of Heterogeneous Treatment Effects using Random Forests",
+      "authors": "Stefan Wager; Susan Athey",
+      "year": 2018,
+      "url": "https://arxiv.org/abs/1510.04342",
+      "locator": "honesty、因果森林的一致性与渐近推断条件"
+    },
+    {
+      "id": "generalized-random-forests",
+      "title": "Generalized Random Forests",
+      "authors": "Susan Athey; Julie Tibshirani; Stefan Wager",
+      "year": 2019,
+      "url": "https://arxiv.org/abs/1610.01271",
+      "locator": "局部矩条件、森林权重与异质效应"
+    },
+    {
+      "id": "grf-causal-forest",
+      "title": "Causal forest",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/reference/causal_forest.html",
+      "locator": "Y.hat, W.hat, honesty, sample.fraction, prediction"
+    },
+    {
+      "id": "grf-algorithm",
+      "title": "The GRF Algorithm",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/REFERENCE.html",
+      "locator": "Training, Orthogonalization, Prediction, Variance Estimates"
+    },
+    {
+      "id": "grf-importance",
+      "title": "Calculate variable importance",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/reference/variable_importance.html",
+      "locator": "深度加权的分裂次数"
+    }
+  ],
+  "exerciseIds": [
+    "w09-l03-honesty",
+    "w09-l03-band"
+  ],
+  "codeStatus": "not-run"
+}

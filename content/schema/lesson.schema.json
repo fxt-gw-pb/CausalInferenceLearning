@@ -1,0 +1,390 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Causal study lesson v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "week",
+    "order",
+    "title",
+    "summary",
+    "status",
+    "readingMinutes",
+    "tags",
+    "objectives",
+    "prerequisites",
+    "sections",
+    "references",
+    "exerciseIds",
+    "codeStatus"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^w0[1-9]-l[0-9]{2}$"
+    },
+    "week": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string"
+    },
+    "statusNote": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "outline",
+        "draft",
+        "demo",
+        "ready"
+      ]
+    },
+    "readingMinutes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "tags": {
+      "$ref": "#/$defs/strings"
+    },
+    "objectives": {
+      "$ref": "#/$defs/strings"
+    },
+    "prerequisites": {
+      "$ref": "#/$defs/strings"
+    },
+    "exerciseIds": {
+      "$ref": "#/$defs/strings"
+    },
+    "codeStatus": {
+      "enum": [
+        "none",
+        "not-run",
+        "verified"
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "blocks"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/block"
+            }
+          }
+        }
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "authors",
+          "year",
+          "url",
+          "locator"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "string"
+          },
+          "year": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https://"
+          },
+          "locator": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "block": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "paragraph"
+            },
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "items"
+          ],
+          "properties": {
+            "type": {
+              "const": "list"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ordered": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "title",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "callout"
+            },
+            "title": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "tone": {
+              "enum": [
+                "note",
+                "warning"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "const": "equation"
+            },
+            "text": {
+              "type": "string"
+            },
+            "mathml": {
+              "type": "string"
+            },
+            "caption": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "headers",
+            "rows"
+          ],
+          "properties": {
+            "type": {
+              "const": "table"
+            },
+            "headers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "caption": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "language",
+            "code",
+            "execution"
+          ],
+          "properties": {
+            "type": {
+              "const": "code"
+            },
+            "language": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            },
+            "execution": {
+              "enum": [
+                "not-run",
+                "verified"
+              ]
+            },
+            "caption": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "prompt",
+            "options",
+            "answer",
+            "explanation"
+          ],
+          "properties": {
+            "type": {
+              "const": "exercise"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$"
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 5,
+              "items": {
+                "type": "string"
+              }
+            },
+            "answer": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4
+            },
+            "explanation": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "kind"
+          ],
+          "properties": {
+            "type": {
+              "const": "interactive"
+            },
+            "kind": {
+              "enum": [
+                "standardization"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "kind"
+          ],
+          "properties": {
+            "type": {
+              "const": "diagram"
+            },
+            "kind": {
+              "enum": [
+                "confounding-dag"
+              ]
+            },
+            "caption": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

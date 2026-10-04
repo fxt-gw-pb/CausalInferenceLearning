@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "id": "w05-l02",
+  "week": 5,
+  "order": 2,
+  "title": "DML 与正交得分",
+  "summary": "用自洽的血压残差例子推导PLR，再连接Neyman正交性、外层交叉拟合及允许异质效应的IRM。",
+  "status": "ready",
+  "readingMinutes": 32,
+  "tags": [
+    "PLR",
+    "IRM",
+    "Neyman 正交性",
+    "残差化",
+    "交叉拟合"
+  ],
+  "objectives": [
+    "区分结构函数g、边际结果预测ℓ和处理预测m。",
+    "推导PLR残差估计式及其二阶误差项。",
+    "辨认异质效应下PLR与IRM-ATE的不同目标。"
+  ],
+  "prerequisites": [
+    "条件期望与协方差",
+    "简单回归斜率",
+    "AIPW误差乘积"
+  ],
+  "sections": [
+    {
+      "id": "plr-model",
+      "title": "部分线性模型与血压结局",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "设A表示是否采用一项基线降压策略，Y表示约定随访时点的收缩压，单位为mmHg，数值越低表示血压越低。W包括处理前血压、年龄等适当基线信息。本课数字为独立数学教学例，忽略删失和不依从。讨论治疗效果前，仍须论证处理定义、一致性、交换性和重叠。"
+        },
+        {
+          "type": "equation",
+          "text": "Y = θ₀A + g₀(W) + U，E[U | A,W] = 0；A = m₀(W) + V，E[V | W] = 0"
+        },
+        {
+          "type": "paragraph",
+          "text": "PLR是部分线性回归模型。A的效应以共同系数θ₀进入条件均值；g₀可以是复杂非线性函数。θ₀=−10表示在这一模型与因果条件下采用策略使平均收缩压降低10mmHg。m₀(W)=E[A|W]，二元A时它就是处理概率。误差U和V具有指定条件均值限制；仅把它们叫作未观测因素并不满足这些限制。"
+        },
+        {
+          "type": "paragraph",
+          "text": "定义ℓ₀(W)=E[Y|W]。对结构式给定W求期望，得到ℓ₀=θ₀m₀+g₀。由此ℓ₀和g₀通常不同：ℓ₀已经平均了观察分配机制下的处理贡献。用W直接预测Y估计的是ℓ₀；不能给这个预测器贴上结构g₀的名称后省略θ₀m₀。"
+        }
+      ]
+    },
+    {
+      "id": "residual-derivation",
+      "title": "残差回归的推导与算例",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "Y−ℓ₀(W) = θ₀{A−m₀(W)} + U"
+        },
+        {
+          "type": "paragraph",
+          "text": "从Y结构式减去ℓ₀=θ₀m₀+g₀，复杂基线函数g₀被抵消。再乘处理残差V=A−m₀(W)并取期望，E[UV]=0，因此只要E[V²]>0，就有下式。"
+        },
+        {
+          "type": "equation",
+          "text": "θ₀ = E[(A−m₀(W))(Y−ℓ₀(W))] / E[(A−m₀(W))²]"
+        },
+        {
+          "type": "paragraph",
+          "text": "下面令预测函数视为已知，并有意让示例U=0，使四行都能手算。患者实际接受A=1而预测处理概率为0.8时，处理残差为0.2；没有接受时则为−0.8。结果残差同样用实测收缩压减去ℓ预测，保持mmHg单位。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察",
+            "A",
+            "m₀",
+            "ℓ₀",
+            "Y",
+            "A−m₀",
+            "Y−ℓ₀"
+          ],
+          "rows": [
+            [
+              "1",
+              "0",
+              "0.8",
+              "140",
+              "148",
+              "−0.8",
+              "8"
+            ],
+            [
+              "2",
+              "1",
+              "0.8",
+              "140",
+              "138",
+              "0.2",
+              "−2"
+            ],
+            [
+              "3",
+              "0",
+              "0.6",
+              "130",
+              "136",
+              "−0.6",
+              "6"
+            ],
+            [
+              "4",
+              "1",
+              "0.6",
+              "130",
+              "126",
+              "0.4",
+              "−4"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "四行处理残差平方和为1.2，两个残差乘积和为−12，因此无截距残差回归系数为−10。负号来自Y是随访血压值。如果改用下降量且定义为基线减随访，效果符号会反向；报告必须把结局定义和单位写在结果旁。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "A = [0,1,0,1]\nm = [0.8,0.8,0.6,0.6]\nell = [140,140,130,130]\nY = [148,138,136,126]\nv = [a-p for a,p in zip(A,m)]\nr = [y-l for y,l in zip(Y,ell)]\nnum = sum(x*y for x,y in zip(v,r))\nden = sum(x*x for x in v)\ntheta = num/den\nassert abs(num+12)<1e-12 and abs(den-1.2)<1e-12\nassert abs(theta+10)<1e-12\nprint(round(num,2), round(den,2), round(theta,2))",
+          "execution": "verified",
+          "caption": "已执行：分子−12、分母1.2、θ=−10mmHg。四行是自洽残差演算，不提供统计推断。"
+        },
+        {
+          "type": "callout",
+          "title": "残差化的解释范围",
+          "text": "残差与某些已调整函数正交，不等于全部残差彼此独立。残差化也不会把观察研究变成随机试验。θ的因果解释仍依赖结构和识别条件。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "orthogonality",
+      "title": "零矩条件与局部正交性",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "DML使用一个在真参数处平均为零的得分方程，同时让这个平均对辅助函数的小扰动一阶不敏感。对PLR的partialling-out版本，记η=(ℓ,m)，定义下式。这里用φ表示得分，避免与前课ATE参数ψ混淆。"
+        },
+        {
+          "type": "equation",
+          "text": "φ(O;θ,η) = {Y−ℓ(W)−θ[A−m(W)]}{A−m(W)}"
+        },
+        {
+          "type": "equation",
+          "text": "E[φ(O;θ₀,η₀)] = 0；d/dt E[φ(O;θ₀,η₀+t h)]|t=0 = 0",
+          "caption": "第一式是零矩条件；第二式对允许的函数方向h成立，是Neyman正交性。"
+        },
+        {
+          "type": "paragraph",
+          "text": "第二式关心总体平均得分的方向导数，不能用单个观察的得分导数等于零替代。对ℓ的扰动hℓ，一阶项是−E[hℓ(W)V]，因E[V|W]=0而消失。对m的扰动hm，一阶项是E[hm(W)(θ₀V−U)]，同样由条件均值为零消失。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这解释了局部误差为何常以二阶项进入。不过函数偏差很大时，二阶项仍可能很大。正交性是某个得分在真函数邻域内的性质，不能被解释为无须学习好辅助函数。"
+        }
+      ]
+    },
+    {
+      "id": "second-order",
+      "title": "PLR误差项与双重稳健边界",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "令δℓ=ℓ̂−ℓ₀、δm=m̂−m₀。把固定候选函数代入真θ₀处的得分，得到(U−δℓ+θ₀δm)(V−δm)。取期望，含U或V的一阶项消失，剩下下面两项。"
+        },
+        {
+          "type": "equation",
+          "text": "E[φ(O;θ₀,ℓ̂,m̂)] = E[δℓ·δm − θ₀(δm)²]"
+        },
+        {
+          "type": "paragraph",
+          "text": "因此，对于这里的partialling-out得分，不能无条件套用AIPW的任一预测模型正确分支。若m̂=m₀，上式为0；若只有ℓ̂=ℓ₀而m̂有误差，仍保留−θ₀E[(δm)²]。例如θ₀=−10且δm恒为0.1，平均得分误差为0.1，而非0。误差随着扰动幅度的平方缩小，这与局部正交性相容。"
+        },
+        {
+          "type": "paragraph",
+          "text": "另一个PLR的IV-type得分写成(Y−θA−g(W))(A−m(W))，其中g是结构函数。该得分在相应条件下具有针对g与m的不同稳健性。它与使用ℓ的残差式有不同的辅助函数定义。软件和论文中讨论稳健性时，必须一并写出模型、得分和函数含义。"
+        },
+        {
+          "type": "paragraph",
+          "text": "对交叉拟合的AIPW/IRM，强重叠和适当矩条件下，一个常见的充分要求是Q误差与e误差的L²范数乘积为oₚ(n⁻¹ᐟ²)。两个误差都比n⁻¹ᐟ⁴收敛得更快是一个充分情形，但并非唯一可能。PLR partialling-out还要控制δm的平方项及相应误差组合。DML名称或折数本身不蕴含这些速度条件。"
+        }
+      ]
+    },
+    {
+      "id": "cross-fitting",
+      "title": "外层交叉拟合的样本流向",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "把独立观察分成K个外层验证折I₁,…,I_K，保存折号。若有聚类，划分单位需相应调整。",
+            "对第k折，用其余观察拟合ℓ̂与m̂。若使用SL或需要调参，把它们的全部内部步骤限制在该外层训练集。",
+            "只为I_k中的观察产生折外预测；每个人的Y和A都没有参与产生其预测器的训练。",
+            "拼接各折预测，构造所有人的残差得分。本文用合并矩方程求θ，即残差乘积总和除以处理残差平方总和。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "equation",
+          "text": "θ̂ = Σᵢ [Aᵢ−m̂₋ₖ₍ᵢ₎(Wᵢ)][Yᵢ−ℓ̂₋ₖ₍ᵢ₎(Wᵢ)] / Σᵢ [Aᵢ−m̂₋ₖ₍ᵢ₎(Wᵢ)]²"
+        },
+        {
+          "type": "paragraph",
+          "text": "外层划分减少每个评价点参与自身训练造成的依赖。不同验证点的预测仍可能共享训练资料，不能说所有得分完全独立。可以重复随机划分来检查分折敏感性，但重复估计彼此相关，不能把它们当作新的独立样本把标准误除以重复次数的平方根。"
+        }
+      ]
+    },
+    {
+      "id": "irm-and-heterogeneity",
+      "title": "异质效应与 IRM 的目标",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "若真实条件均值为Q₀(W)+Aτ(W)，不同W有不同τ，partialling-out的总体系数一般为按条件处理方差加权的效应。对于二元A，这个权重为e(W){1−e(W)}。在其他相关条件成立时，可写为下式。"
+        },
+        {
+          "type": "equation",
+          "text": "θPLR = E[e(W){1−e(W)}τ(W)] / E[e(W){1−e(W)}]；ATE = E[τ(W)]"
+        },
+        {
+          "type": "paragraph",
+          "text": "例如两个亚组各半，处理概率分别0.1和0.5，治疗效应分别−4和−12mmHg。ATE为−8；PLR加权目标为(0.09×−4+0.25×−12)/(0.09+0.25)≈−9.88。重叠更好的第二组贡献更大。两结果有差异可以来自目标定义，并不必然表示某个软件算错。"
+        },
+        {
+          "type": "paragraph",
+          "text": "IRM允许Q₁(W)与Q₀(W)自由变化，二元处理ATE的得分就是上一课AIPW信号减ψ。它使用Q₀、Q₁、e，目标为E[Q₁−Q₀]。IRM的二元要求在处理A上；Y可以二元，也可以连续。因此降压连续结局也可用IRM，不能只凭结局类型在PLR与IRM之间切换。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "方法/模型",
+            "主要函数",
+            "本章目标",
+            "关键限制"
+          ],
+          "rows": [
+            [
+              "PLR partialling-out",
+              "ℓ=E[Y|W]，m=E[A|W]",
+              "部分线性结构下的θ",
+              "异质效应时常变为处理方差加权目标"
+            ],
+            [
+              "IRM ATE",
+              "Q₀、Q₁、e",
+              "总体平均效应",
+              "二元处理，识别、重叠与学习条件仍需成立"
+            ],
+            [
+              "SL",
+              "特定预测任务的条件均值或概率",
+              "预测损失",
+              "仅完成辅助函数学习，未单独定义因果效应"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "practice",
+      "title": "练习与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w05-l02-ex1",
+          "prompt": "PLR结构式为Y=θA+g(W)+U，直接以W预测Y时，估计的函数是",
+          "options": [
+            "g(W)",
+            "ℓ(W)=θm(W)+g(W)",
+            "θ本身",
+            "Y(1)−Y(0)"
+          ],
+          "answer": 1,
+          "explanation": "给定W求条件期望后，观察机制下的处理贡献为θE[A|W]=θm(W)。因此直接预测Y得到ℓ，减去ℓ才可推导对应的残差关系。把ℓ误当g会混淆得分和稳健性结论。"
+        },
+        {
+          "type": "exercise",
+          "id": "w05-l02-ex2",
+          "prompt": "对于本课partialling-out得分，ℓ正确但m存在固定误差时，最准确的判断是",
+          "options": [
+            "必定双重稳健，因为其中一个预测模型正确",
+            "可能留下−θ₀E[(δm)²]的平均得分误差",
+            "只要没有截距，误差必消失",
+            "该方法不具有任何正交性"
+          ],
+          "answer": 1,
+          "explanation": "局部正交性消除一阶项，保留二阶项。ℓ正确令δℓ=0，但δm平方仍在；因此无需否定正交性，也不能直接套用AIPW的两个正确性分支。"
+        },
+        {
+          "type": "exercise",
+          "id": "w05-l02-ex3",
+          "prompt": "二元A、连续Y且研究者希望在异质效应下估计全人群ATE，合适的起点是",
+          "options": [
+            "因Y连续而必须用PLR",
+            "使用IRM-ATE，并论证识别与学习条件",
+            "把A连续化后回归",
+            "只估处理组平均Y"
+          ],
+          "answer": 1,
+          "explanation": "IRM的二元限制在处理A上，结局可以连续。IRM-ATE通过Q₁、Q₀与e估计总体平均差。PLR可能适合有依据的共同斜率结构，但异质性下其目标需要单独解释。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "dml-paper",
+      "title": "Double/Debiased Machine Learning for Treatment and Structural Parameters",
+      "authors": "Victor Chernozhukov; Denis Chetverikov; Mert Demirer; Esther Duflo; Christian Hansen; Whitney Newey; James Robins",
+      "year": 2018,
+      "url": "https://doi.org/10.1111/ectj.12097",
+      "locator": "Published in The Econometrics Journal 21: C1–C68; Sections 2–3, 4.1 and 5.1"
+    },
+    {
+      "id": "dml-scores",
+      "title": "DoubleML: Score functions",
+      "authors": "DoubleML authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://docs.doubleml.org/stable/guide/scores.html",
+      "locator": "Neyman orthogonality; PLR partialling-out and IV-type; binary IRM ATE"
+    },
+    {
+      "id": "dml-irm",
+      "title": "DoubleMLIRM R reference",
+      "authors": "DoubleML authors",
+      "year": "在线文档，2026-10-04 核对",
+      "url": "https://docs.doubleml.org/r/stable/reference/DoubleMLIRM.html",
+      "locator": "Model, ml_g, ml_m, n_folds, n_rep and score arguments"
+    },
+    {
+      "id": "bang-robins",
+      "title": "Doubly Robust Estimation in Missing Data and Causal Inference Models",
+      "authors": "Heejung Bang; James M. Robins",
+      "year": 2005,
+      "url": "https://doi.org/10.1111/j.1541-0420.2005.00377.x",
+      "locator": "Biometrics 61: double robustness and causal inference models"
+    }
+  ],
+  "exerciseIds": [
+    "w05-l02-ex1",
+    "w05-l02-ex2",
+    "w05-l02-ex3"
+  ],
+  "codeStatus": "verified"
+}

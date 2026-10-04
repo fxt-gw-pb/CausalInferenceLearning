@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "id": "w09-l04",
+  "week": 9,
+  "order": 4,
+  "title": "因果森林与稳健评估",
+  "summary": "把森林的异质性发现与组效应确认分开；在冻结的亚组中计算 AIPW 分数、GATE 和组间对比。",
+  "status": "ready",
+  "readingMinutes": 28,
+  "tags": [
+    "发现与评估分离",
+    "GATE",
+    "AIPW",
+    "TMLE"
+  ],
+  "objectives": [
+    "设计独立发现与评估的数据流程",
+    "用样本外 AIPW 分数估计固定组的平均效应",
+    "区分预测均值的描述与因果效应推断",
+    "说明组选择、多重比较和外部验证的额外要求"
+  ],
+  "prerequisites": [
+    "w09-l03",
+    "w05-l01",
+    "w06-l01"
+  ],
+  "sections": [
+    {
+      "id": "two-jobs",
+      "title": "发现模式与估计效应",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "森林可以帮助发现效应评分、候选阈值和可能重要的基线特征。下一步若要报告一个亚组的平均因果效应及区间，需要为该组建立明确目标与推断。把 τ̂ 取平均是一种可定义的模型汇总；它不自动带有 AIPW 或 TMLE 的推断性质。因果森林本身也有相应的推断理论，不能一概称其无法进行推断。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本节采用易于审计的独立分割：发现集 D 用于模型选择、训练和冻结规则 G_D(x)；评估集 E 只按已冻结规则分组，计算效应。条件于发现集，目标为 ψ_G=E[Y(1)−Y(0)∣G_D(X)=1]。这对应本次学得的规则，而不是自动把所有可能重训规则的不确定性一并计入。"
+        }
+      ]
+    },
+    {
+      "id": "workflow",
+      "title": "五步评估设计",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "步骤",
+            "允许使用的信息",
+            "保存的结果"
+          ],
+          "rows": [
+            [
+              "1. 发现",
+              "仅发现集 A、Y、X",
+              "候选学习器、训练模型与预设筛选原则"
+            ],
+            [
+              "2. 冻结",
+              "发现集预测及科学依据",
+              "数值阈值、变量编码、排序方向、主要对比"
+            ],
+            [
+              "3. 样本外预测",
+              "发现集拟合的 Q/g；评估集 X、A",
+              "评估对象的 Q̂₀、Q̂₁、ê"
+            ],
+            [
+              "4. 效应估计",
+              "评估集 Y 与已冻结的 G",
+              "每组 AIPW 分数均值、适当方差与重叠诊断"
+            ],
+            [
+              "5. 对比与解释",
+              "事先规定的组差及误差控制",
+              "组间差、区间、稳定性和后续验证计划"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "如果评估结果不好便回头更换阈值，再用同一评估集报告普通区间，评估集已经变成新的发现集。交叉拟合可以更高效地利用数据，但必须明确各折如何定义组、训练 nuisance、估计共同目标及聚合；只写五折这个标签不够。"
+        }
+      ]
+    },
+    {
+      "id": "score",
+      "title": "组内 AIPW 分数",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "Γᵢ=Q̂₁(Xᵢ)−Q̂₀(Xᵢ)+Aᵢ{Yᵢ−Q̂₁(Xᵢ)}/ê(Xᵢ)−(1−Aᵢ){Yᵢ−Q̂₀(Xᵢ)}/{1−ê(Xᵢ)}。"
+        },
+        {
+          "type": "equation",
+          "text": "ψ̂G=ΣᵢI{G(Xᵢ)=1}Γᵢ / nG；nG=ΣᵢI{G(Xᵢ)=1}。"
+        },
+        {
+          "type": "paragraph",
+          "text": "标准化部分给出两种干预的预测差，加权残差用实际观察到的 Y 纠正预测误差。固定基线组内，在相应识别、正性与 nuisance 条件下可利用同样的双重稳健结构。若组里几乎全是处理者或全是对照者，整体样本有重叠也不能保证该组的信息充分。"
+        },
+        {
+          "type": "equation",
+          "text": "D_G(O)=I{G(X)=1}/P{G(X)=1}×{Γ(O)−ψG}。"
+        },
+        {
+          "type": "paragraph",
+          "text": "在独立同分布样本、固定规则和合适的渐近线性条件下，组内 Γ 的样本标准差除以 sqrt(nG) 是相应一阶标准误形式。聚类、抽样权重、估计规则的不确定性和复杂交叉拟合须另行处理。把 τ̂ 的标准差除以 sqrt(nG) 仅反映预测数值的组内离散程度，不能代替这套得分推断。"
+        }
+      ]
+    },
+    {
+      "id": "numerical",
+      "title": "已知 nuisance 的独立模拟核验",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "构造 X 在 [0,1] 上均匀分布，e(x)=0.3+0.4x，Q₀(x)=0.15+0.20x，τ(x)=−0.04−0.12x。预先固定 X≥0.5 为 G1，其他为 G0。本节把真实 Q/e 直接放进分数，以隔离检验 AIPW 计算；没有宣称已经训练或验证因果森林。"
+        },
+        {
+          "type": "paragraph",
+          "text": "两个组的真平均效应由 X 的组均值算出：G0 的 E[X]=0.25，因此 ψ0=−0.07；G1 的 E[X]=0.75，因此 ψ1=−0.13，组差为 −0.06。下面的有限样本估计会随机偏离这些真值。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "from random import Random\nfrom statistics import mean, variance\nfrom math import sqrt\nrng=Random(944)\ngroups={0:[],1:[]}\nfor _ in range(8000):\n    x=rng.random()\n    e=0.3+0.4*x\n    q0=0.15+0.20*x\n    q1=q0-0.04-0.12*x\n    a=int(rng.random()<e)\n    y=int(rng.random()<(q1 if a else q0))\n    gamma=q1-q0+a*(y-q1)/e-(1-a)*(y-q0)/(1-e)\n    groups[int(x>=0.5)].append(gamma)\nestimate={g:mean(v) for g,v in groups.items()}\nse={g:sqrt(variance(v)/len(v)) for g,v in groups.items()}\nfor g in (0,1):\n    print(g,len(groups[g]),round(estimate[g],5),round(se[g],5))\ndifference=estimate[1]-estimate[0]\nse_difference=sqrt(se[1]**2+se[0]**2)\nprint(\"contrast\",round(difference,5),round(se_difference,5))\nassert sum(map(len,groups.values()))==8000\nassert all(s>0 for s in se.values())",
+          "execution": "verified",
+          "caption": "原创模拟已执行；正态推断仅在本节已知 nuisance、固定互斥组和独立抽样设定下说明。"
+        },
+        {
+          "type": "paragraph",
+          "text": "互斥固定组在本设定下可用两组一阶方差之和构造差值方差。若两个组重叠、共享复杂估计步骤或使用重复交叉拟合，就需要相应联合协方差。实际分析应对组差直接给出区间，不能只比较各组是否显著。"
+        }
+      ]
+    },
+    {
+      "id": "tmle-integration",
+      "title": "AIPW、TMLE 与软件接口",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "TMLE 也可以针对一个预先规定的人群或基线亚组的平均效应。应写出该亚组目标、合适的 targeting 和方差，检查其样本支持。把每个人的森林预测当成一个占位对象，再对它求均值，并没有执行靶向更新。"
+        },
+        {
+          "type": "paragraph",
+          "text": "grf 的 average_treatment_effect 提供特定目标的 AIPW/TMLE 汇总接口，并对 subset 的构造有明确限制。由基线 X 指定的组与利用同一训练资料 Y 学得后挑选的组，在选择依赖上不同。即使最后形式写成 G(X)，也要说明函数如何被学得；表面上只含 X 不能消除整个学习过程使用 Y 的事实。"
+        },
+        {
+          "type": "paragraph",
+          "text": "动态分组工具可以封装分折预测、分数聚合和组间检验。使用前应核对实际折索引、处理方向、目标、组内样本量与版本。自动输出热图不等于验证了组发现和多重比较的全部条件。"
+        }
+      ]
+    },
+    {
+      "id": "interpretation",
+      "title": "解释、稳定性与文献核查",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "同时报告每组样本量、处理比例、风险尺度、重叠、效应与区间，避免只给热图颜色。",
+            "对数据驱动分位数组使用明确方向；Y 为不良事件时，更负 RD 表示较大预测获益。",
+            "变量重要性、PDP 和 SHAP 作为估计函数描述；将机制结论留给独立证据。",
+            "真实研究若涉及生存结局，要核查时间范围、删失、竞争风险及风险差/HR 的区别。",
+            "将探索性结果带到独立人群验证，检查测量、处理定义和基线分布变化。"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "读应用论文时，先查分析目标和实际数据流程，再看漂亮图形：分组在何处形成、每个对象的预测使用了哪些资料、得分怎样计算、比较了多少组、是否处理失访。引用别处的数字不能替代这些核查，预测范围也不等同于已识别的个人效应范围。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w09-l04-leakage",
+          "prompt": "发现集训练森林后，在评估集尝试 20 个阈值并选择最大组差，再对该阈值报告普通 95% 区间。问题在哪里？",
+          "options": [
+            "树数必然过少",
+            "评估集参与了选择，普通固定规则区间未处理选择偏差",
+            "AIPW 无法用于任何亚组"
+          ],
+          "answer": 1,
+          "explanation": "阈值由评估结果决定，使选中对比倾向于放大噪声。需要新的独立确认资料或针对选择的有效推断。AIPW 本身不禁止亚组，但须处理组的来源。"
+        },
+        {
+          "type": "exercise",
+          "id": "w09-l04-se",
+          "prompt": "固定组内应以哪个对象的变动计算本节 AIPW 一阶标准误？",
+          "options": [
+            "只有预测 CATE 的分布",
+            "与目标匹配的影响函数或 AIPW 得分，并满足推断条件",
+            "各棵树预测的简单方差"
+          ],
+          "answer": 1,
+          "explanation": "分数包含结果残差和处理机制信息，反映目标估计所需采样变动。预测 CATE 的离散程度和树间变动均不自动等于该组效应估计的方差。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "grf-average-effects",
+      "title": "Get doubly robust estimates of average treatment effects",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/reference/average_treatment_effect.html",
+      "locator": "AIPW、TMLE、target.sample 与 subset 条件"
+    },
+    {
+      "id": "generalized-random-forests",
+      "title": "Generalized Random Forests",
+      "authors": "Susan Athey; Julie Tibshirani; Stefan Wager",
+      "year": 2019,
+      "url": "https://arxiv.org/abs/1610.01271",
+      "locator": "局部矩条件、森林权重与异质效应"
+    },
+    {
+      "id": "tmle",
+      "title": "tmle: An R Package for Targeted Maximum Likelihood Estimation",
+      "authors": "Susan Gruber; Mark J. van der Laan",
+      "year": 2012,
+      "url": "https://www.jstatsoft.org/article/view/v051i13",
+      "locator": "单时点处理、更新算法、效应尺度与输出"
+    }
+  ],
+  "exerciseIds": [
+    "w09-l04-leakage",
+    "w09-l04-se"
+  ],
+  "codeStatus": "verified"
+}

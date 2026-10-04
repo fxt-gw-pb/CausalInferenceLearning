@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "title": "因果推断学习笔记",
+  "subtitle": "从研究问题到因果效应估计",
+  "edition": "自学版 · 2026",
+  "description": "九周学习目录与原创自学内容。",
+  "weeks": [
+    {
+      "id": "w01",
+      "number": 1,
+      "title": "研究问题与 R 基础",
+      "summary": "研究设计、潜在结果、混杂控制与数据整理。",
+      "prerequisites": "比例与均值、基础概率",
+      "phase": "基础与识别",
+      "lessons": [
+        "w01-l01",
+        "w01-l02",
+        "w01-l03",
+        "w01-l04",
+        "w01-l05",
+        "w01-l06",
+        "w01-l07",
+        "w01-l08",
+        "w01-l09",
+        "w01-l10"
+      ]
+    },
+    {
+      "id": "w02",
+      "number": 2,
+      "title": "DAG、回归与 G 计算",
+      "summary": "从变量关系、调整集走向标准化和参数 G 计算。",
+      "prerequisites": "条件期望、回归基础、R 公式",
+      "phase": "基础与识别",
+      "lessons": [
+        "w02-l01",
+        "w02-l02",
+        "w02-l03",
+        "w02-l04",
+        "w02-l05",
+        "w02-l06",
+        "w02-l07",
+        "w02-l08"
+      ]
+    },
+    {
+      "id": "w03",
+      "number": 3,
+      "title": "倾向得分",
+      "summary": "处理分配、平衡、匹配与加权，以及连续剂量。",
+      "prerequisites": "Logistic 回归、条件分布、方差",
+      "phase": "基础与识别",
+      "lessons": [
+        "w03-l01",
+        "w03-l02"
+      ]
+    },
+    {
+      "id": "w04",
+      "number": 4,
+      "title": "机器学习与 Super Learner",
+      "summary": "用样本外预测与集成学习估计结果和处理模型。",
+      "prerequisites": "G 计算、倾向得分、损失函数",
+      "phase": "估计与学习",
+      "lessons": [
+        "w04-l01",
+        "w04-l02",
+        "w04-l03",
+        "w04-l04"
+      ]
+    },
+    {
+      "id": "w05",
+      "number": 5,
+      "title": "AIPW、双重稳健与 DML",
+      "summary": "理解增强项、交叉拟合与正交矩条件。",
+      "prerequisites": "G 公式、IPW、条件期望、交叉验证",
+      "phase": "估计与学习",
+      "lessons": [
+        "w05-l01",
+        "w05-l02",
+        "w05-l03"
+      ]
+    },
+    {
+      "id": "w06",
+      "number": 6,
+      "title": "TMLE 与靶向更新",
+      "summary": "把初始预测更新到目标参数，并区分常见扩展。",
+      "prerequisites": "AIPW、logit、影响函数、Delta 法",
+      "phase": "估计与学习",
+      "lessons": [
+        "w06-l01",
+        "w06-l02"
+      ]
+    },
+    {
+      "id": "w07",
+      "number": 7,
+      "title": "缺失数据与因果分析",
+      "summary": "缺失机制、相容的插补模型与多重插补内分析。",
+      "prerequisites": "倾向得分、TMLE、方差分解",
+      "phase": "扩展与应用",
+      "lessons": [
+        "w07-l01",
+        "w07-l02",
+        "w07-l03"
+      ]
+    },
+    {
+      "id": "w08",
+      "number": 8,
+      "title": "中介分析与因果中介",
+      "summary": "自然效应、识别条件、效应尺度与联合推断。",
+      "prerequisites": "G 计算、风险差、混杂与中介时序",
+      "phase": "扩展与应用",
+      "lessons": [
+        "w08-l01",
+        "w08-l02"
+      ]
+    },
+    {
+      "id": "w09",
+      "number": 9,
+      "title": "效应异质性与因果森林",
+      "summary": "从预设亚组到元学习器、因果森林和独立评估。",
+      "prerequisites": "平均效应、机器学习、样本外评估",
+      "phase": "扩展与应用",
+      "lessons": [
+        "w09-l01",
+        "w09-l02",
+        "w09-l03",
+        "w09-l04",
+        "w09-l05"
+      ]
+    }
+  ]
+}

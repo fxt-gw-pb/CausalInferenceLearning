@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "id": "w02-l08",
+  "week": 2,
+  "order": 8,
+  "title": "G 计算的 R 实现",
+  "summary": "写出独立的G计算函数，并用与目标人群匹配的bootstrap重跑整个估计流程。",
+  "status": "ready",
+  "readingMinutes": 25,
+  "tags": [
+    "标准化",
+    "效应对比",
+    "不确定性"
+  ],
+  "objectives": [
+    "实现拟合、干预预测、平均和对比。",
+    "在每个bootstrap样本中重拟合同一模型。",
+    "区分总体重抽样与固定目标协变量分布的推断。"
+  ],
+  "prerequisites": [
+    "w02-l05至w02-l07；R函数、抽样和向量"
+  ],
+  "sections": [
+    {
+      "id": "target",
+      "title": "先确定估计和推断的对象",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "本课继续使用1000人的合成预约数据，目标为产生这些独立观察的总体平均风险差。处理A在基线分配，W是基线风险层，Y是完整30天结局。暂不包含聚类、缺失或删失。风险表用于检查代码，模拟数据不能据此推导现实短信服务的效果。"
+        },
+        {
+          "type": "paragraph",
+          "text": "估计程序有两种输入职责：训练数据用于拟合Q；目标数据提供需要平均的W。当前默认二者是同一份样本。把这两种职责分开命名，有助于理解为什么bootstrap中固定原始newdata可能改变所做的推断。"
+        }
+      ]
+    },
+    {
+      "id": "function",
+      "title": "从零实现G计算",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 原创合成1000人；W为处理前风险层，Y为30天失约。\ncells <- data.frame(A=c(0,0,1,1), W=c(0,1,0,1),\n                    n=c(400,100,100,400), events=c(80,50,10,120))\nd <- do.call(rbind, lapply(seq_len(nrow(cells)), function(j) {\n  z <- cells[j, ]\n  data.frame(A=rep(z$A,z$n), W=rep(z$W,z$n),\n             Y=c(rep(1,z$events),rep(0,z$n-z$events)))\n}))\nrownames(d) <- NULL\nd$id <- seq_len(nrow(d))\ngcomp <- function(train, target=train) {\n  stopifnot(all(c(\"A\",\"W\",\"Y\") %in% names(train)),\n            all(train$A %in% c(0,1)), all(train$Y %in% c(0,1)),\n            !anyNA(train[c(\"A\",\"W\",\"Y\")]), !anyNA(target$W))\n  fit <- glm(Y ~ A * W, data=train, family=binomial(link=\"logit\"),\n             na.action=na.fail)\n  if (!fit$converged) stop(\"结果模型未收敛\")\n  target1 <- transform(target, A=1)\n  target0 <- transform(target, A=0)\n  p1 <- predict(fit, newdata=target1, type=\"response\")\n  p0 <- predict(fit, newdata=target0, type=\"response\")\n  if (any(!is.finite(c(p1,p0)))) stop(\"预测存在非有限值\")\n  mu1 <- mean(p1); mu0 <- mean(p0)\n  c(risk1=mu1, risk0=mu0, RD=mu1-mu0,\n    RR=mu1/mu0, OR=(mu1/(1-mu1))/(mu0/(1-mu0)))\n}\npoint <- gcomp(d)\npoint\nstopifnot(abs(point[\"RD\"] + .15) < 1e-6)",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例的校准目标是风险1为0.20、风险0为0.35、RD为−0.15。它们来自四格表的独立手算，并非当前环境运行R得到的报告。函数内重复写family、response预测和收敛检查，是为了让每次调用使用相同估计定义。"
+        }
+      ]
+    },
+    {
+      "id": "bootstrap",
+      "title": "每次重抽样都重新计算",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "普通独立同分布bootstrap从n行中有放回地抽取n行；同一个人可能出现多次，也可能一次都不出现。每轮用该重抽样数据重新拟合结果模型，并对重抽样的W分布进行两种策略预测和平均。这样同时反映了训练样本和经验目标分布的抽样波动。"
+        },
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 继续运行本页先前的d和gcomp；不安装任何扩展包。\nset.seed(20261004)\nB <- 999L\nboot_rd <- numeric(B)\nfor (b in seq_len(B)) {\n  index <- sample.int(nrow(d), size=nrow(d), replace=TRUE)\n  db <- d[index, , drop=FALSE]\n  boot_rd[b] <- unname(gcomp(train=db, target=db)[\"RD\"])\n}\nstopifnot(all(is.finite(boot_rd)))\nresult <- c(estimate=unname(point[\"RD\"]),\n            SE=sd(boot_rd),\n            lower=unname(quantile(boot_rd,.025)),\n            upper=unname(quantile(boot_rd,.975)))\nresult\nsessionInfo()",
+          "caption": "原创base R代码；当前未执行，不提供虚构的R置信区间。B=999用于学习，正式分析需评估重复次数与区间稳定性。"
+        },
+        {
+          "type": "paragraph",
+          "text": "这里命名的是百分位bootstrap区间，即重复估计的2.5%和97.5%分位数。sd(boot_rd)估计原估计器的标准误，不能再除以√B；B增加主要降低bootstrap计算本身的Monte Carlo误差，并不会让原始数据量变大。若警告、分离或拟合失败，应诊断原因并报告，不能把失败轮次偷偷丢掉后照常给区间。"
+        }
+      ]
+    },
+    {
+      "id": "fixed",
+      "title": "固定目标人群需要单独设计推断",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "若每轮改成gcomp(train=db,target=d)，目标W始终固定在原始样本。这种计算将目标协变量分布视为固定，主要传播训练模型的不确定性。它与上面针对总体平均的整流程重抽样不同；是否适合取决于研究确实把哪群人视为固定目标，以及训练与目标资料的抽样关系。"
+        },
+        {
+          "type": "paragraph",
+          "text": "如果观察单位按门诊聚类，简单逐行重抽样会打散相关结构，通常需要与设计相适应的整簇重抽样或其他方差方法。若还有样本内变量筛选、插补或其他估计步骤，也应明确这些步骤的不确定性如何进入推断。增加循环次数也无法修复抽样单位错误。"
+        }
+      ]
+    },
+    {
+      "id": "checks",
+      "title": "实现检查清单",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "A=1的方向和Y=1的事件含义，与文字报告一致。",
+            "newdata只替换处理列，保留目标W；因子水平与拟合时相容。",
+            "每次glm显式使用同一family、公式和数据处理。",
+            "每次预测使用response尺度，再分别平均。",
+            "结果尺度清楚：RD用百分点；RR和OR分别按定义计算。",
+            "报告n、随机种子、重复次数、区间方法、运行版本和诊断。"
+          ],
+          "ordered": true
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l08-se",
+          "prompt": "boot_rd有999个重复RD。原估计的bootstrap标准误应使用：",
+          "options": [
+            "sd(boot_rd)",
+            "sd(boot_rd)/sqrt(999)",
+            "mean(boot_rd)"
+          ],
+          "answer": 0,
+          "explanation": "重复估计的标准差近似原估计器的抽样标准误。除以√999对应另一种Monte Carlo均值精度问题，不能当作原研究估计的标准误。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l08-target",
+          "prompt": "针对总体平均进行普通i.i.d. bootstrap时，最一致的默认流程是：",
+          "options": [
+            "重抽样训练数据，却一直对原始W平均而不解释",
+            "每轮重新拟合，并对该重抽样数据的W平均",
+            "只重抽样已生成的两组预测，不重拟合"
+          ],
+          "answer": 1,
+          "explanation": "第二项重跑了完整样本估计器。固定目标或只抽预测可能用于其他明确问题，但不等同于这里定义的整流程bootstrap。"
+        },
+        {
+          "type": "paragraph",
+          "text": "扩展练习：把目标人群改为W=1占70%，保持四格风险不变，预先手算风险1=.24、风险0=.41、RD=−.17。再给函数增加目标权重实现同一计算，说明目标分布变化为何使平均效应更负。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第13章与Technical Point 13.1：标准化与整流程bootstrap"
+    },
+    {
+      "id": "r-glm",
+      "title": "R Documentation: glm",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/glm.html",
+      "locator": "默认family与模型拟合参数"
+    },
+    {
+      "id": "r-predict.glm",
+      "title": "R Documentation: predict.glm",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/predict.glm.html",
+      "locator": "newdata与response尺度"
+    }
+  ],
+  "exerciseIds": [
+    "w02-l08-se",
+    "w02-l08-target"
+  ],
+  "codeStatus": "not-run"
+}

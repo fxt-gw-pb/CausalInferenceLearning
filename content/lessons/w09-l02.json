@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "id": "w09-l02",
+  "week": 9,
+  "order": 2,
+  "title": "效应建模与元学习器",
+  "summary": "用统一的条件效应目标比较 S、T、X、R 学习器；推导 R-loss，并用反例区分正交性与 AIPW 的双重稳健。",
+  "status": "ready",
+  "readingMinutes": 29,
+  "tags": [
+    "S、T、X、R 学习器",
+    "估计目标"
+  ],
+  "objectives": [
+    "写出四种元学习器的数据流与伪结局",
+    "说明样本不平衡与正则化对方法的影响",
+    "推导 Robinson 残差关系",
+    "用数值反例纠正 R learner 的过强稳健性断言"
+  ],
+  "prerequisites": [
+    "w09-l01",
+    "w04-l01",
+    "w05-l02"
+  ],
+  "sections": [
+    {
+      "id": "common-target",
+      "title": "共同目标与学习策略",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "元学习器规定如何组织监督学习任务，其基础学习器可以是回归、森林或其他合适的预测模型。这里固定二元 A、基线 X 和 τ(x)=Q₁(x)−Q₀(x)。所有方法使用相同识别前提和同一基线信息集。若一个方法只调年龄，另一个还调多个混杂因素，结果差异无法单纯归因为算法。"
+        },
+        {
+          "type": "paragraph",
+          "text": "效应学习面对一个特殊困难：每位对象只有一个结果标签，而 Q₁ 与 Q₀ 的差才是目标。对 Y 的预测误差很小，仍可能对这个差估计得不好。比较应围绕目标任务和独立评估，不能只把整体结果预测误差最低的方法称为因果最优。"
+        }
+      ]
+    },
+    {
+      "id": "s-and-t",
+      "title": "S 与 T 学习器",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "S：拟合 Q̂(a,x)，再令 τ̂S(x)=Q̂(1,x)−Q̂(0,x)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "S 学习器把 A 当作同一结果模型的输入，允许跨处理组共享统计信息。若模型的正则化过强，或很少用到 A 及其交互，预测可能对 A 不敏感，导致效应被压向零。线性模型只含 A 主效应时，得到常数效应是模型限制的结果。"
+        },
+        {
+          "type": "equation",
+          "text": "T：分别拟合 Q̂₁(x)、Q̂₀(x)，再令 τ̂T(x)=Q̂₁(x)−Q̂₀(x)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "T 学习器为两组提供不同的响应面，更直接容纳复杂差异。代价是少数组的模型可能数据不足，而且两个较大预测误差相减不保证抵消。在没有重叠的特征区域，两个方法都要依赖外推。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "特征层",
+            "预测 Q₀",
+            "预测 Q₁",
+            "差值 τ̂"
+          ],
+          "rows": [
+            [
+              "x 低",
+              "0.20",
+              "0.15",
+              "−0.05"
+            ],
+            [
+              "x 高",
+              "0.40",
+              "0.25",
+              "−0.15"
+            ]
+          ],
+          "caption": "这张预测表可来自 S 或 T；仅看最终差值不能判断训练策略。"
+        }
+      ]
+    },
+    {
+      "id": "x-learner",
+      "title": "X 学习器的伪效应",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "处理者：D¹=Y−Q̂₀(X)；对照者：D⁰=Q̂₁(X)−Y。"
+        },
+        {
+          "type": "paragraph",
+          "text": "先按 T 学习器得到两个结果面。对处理者，用观察 Y 减去预测的未处理结果；对照者则用预测的处理结果减去观察 Y。两种伪效应都保持处理减对照的方向。它们带有结果噪声和第一阶段误差，不是观测到的个人真实效应。"
+        },
+        {
+          "type": "equation",
+          "text": "τ̂¹(x)≈E[D¹∣A=1,X=x]；τ̂⁰(x)≈E[D⁰∣A=0,X=x]；τ̂X(x)=g(x)τ̂⁰(x)+{1−g(x)}τ̂¹(x)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "g(x) 是组合权重，一种常见选择为倾向得分。若处理者占绝大多数，Q₁ 估得较好，少数对照者的 D⁰ 可能利用这个准确面，较大的 g 会增加 τ̂⁰ 的份额。最佳组合仍依赖两个阶段的误差与函数结构；X 学习器并不在所有问题中占优。"
+        }
+      ]
+    },
+    {
+      "id": "r-loss",
+      "title": "R 学习器的残差目标",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "m(x)=E[Y∣X=x]；e(x)=P(A=1∣X=x)；Y−m(X)={A−e(X)}τ(X)+ε，E[ε∣A,X]=0。"
+        },
+        {
+          "type": "paragraph",
+          "text": "对二元处理，在正确 Q 与 e 下，这个等式可由 Q(A,X)=Q₀(X)+Aτ(X) 及 m(X)=Q₀(X)+e(X)τ(X) 得到。残差化同时去除基线结果水平和可预测的处理分配，让第二阶段集中学习处理残差对应的结果变化。"
+        },
+        {
+          "type": "equation",
+          "text": "τ̂R=argminτ [(1/n)Σᵢ{Yᵢ−m̂⁽⁻ᶠ⁾(Xᵢ)−[Aᵢ−ê⁽⁻ᶠ⁾(Xᵢ)]τ(Xᵢ)}²+Λ(τ)]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "上标 −f 表示 nuisance 预测来自不包含第 i 人的训练折，Λ 为复杂度惩罚。正交性可使真值附近 nuisance 的小扰动对目标的影响变为高阶。它仍需要相应收敛率、支持和函数类条件；不能直接套用 AIPW 的任一模型正确即一致的表述。"
+        }
+      ]
+    },
+    {
+      "id": "counterexample",
+      "title": "一项正确不足以保证的反例",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "固定一个 X，真实 e=0.5、τ=2，m 已知正确。误用 ē=0.9 时，令 v=A−ē。最小化 E[{Y−m−v t}²] 得到 t=E[v(Y−m)]/E[v²]。分子是 τe(1−e)，分母多出 (e−ē)²。"
+        },
+        {
+          "type": "equation",
+          "text": "t*=τ e(1−e)/{e(1−e)+(e−ē)²}=2×0.25/(0.25+0.16)≈1.2195。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "e,wrong_e,tau=0.5,0.9,2.0\nr_slope=tau*e*(1-e)/(e*(1-e)+(e-wrong_e)**2)\nassert abs(r_slope-50/41)<1e-12\nassert abs(r_slope-tau)>0.7\nprint(r_slope)\n# X 学习器的组合算术；两种 tau 估计都取处理减对照。\ne_x,tau0,tau1=0.8,-0.12,-0.08\ntau_x=e_x*tau0+(1-e_x)*tau1\nassert abs(tau_x+0.112)<1e-12\nprint(tau_x)",
+          "execution": "verified",
+          "caption": "原创解析反例与组合核验，已执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "m 完全正确，R-loss 最优斜率仍偏离 2，已经足以否定任意一个 nuisance 正确便可的通则。这个反例不否认正交性或准 oracle 理论：那些结论涉及真值附近的误差和明确速率，而这里把 e 固定在错误值。"
+        }
+      ]
+    },
+    {
+      "id": "evaluation",
+      "title": "选择、实现与评估",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "固定处理对比、结局窗口、目标总体和 X；统一训练/验证划分。",
+            "调参只接触训练信息；需要样本外 nuisance 的阶段显式保存折号。",
+            "二元 Y 的结果预测应在概率尺度，g/e 应采用合法概率；R learner 的第二阶段伪结局可为连续。",
+            "在模拟中可用已知 τ(x) 计算 CATE 均方误差；真实数据通常没有每人的真 τ(x)，需借助合适的样本外损失或组效应评估。",
+            "比较稳定性、重叠和有效样本量，同时记录算力、超参数和随机种子。"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "常见的 R-loss 可写成对 (Y−m̂)/(A−ê) 的加权回归，权重为 (A−ê)²，但接近零的分母会引发数值问题。直接优化残差损失通常更清楚；不能只做除法、忽略权重，再声称实现了相同目标。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w09-l02-sign",
+          "prompt": "对照者 Y=0.4、预测处理均值 Q̂₁=0.3，X 学习器的 D⁰ 应是多少？",
+          "options": [
+            "+0.1",
+            "−0.1",
+            "0.12"
+          ],
+          "answer": 1,
+          "explanation": "D⁰=Q̂₁−Y=−0.1，保持处理减对照。处理者的式子则为 Y−Q̂₀；两边不能沿用同一减法次序。"
+        },
+        {
+          "type": "exercise",
+          "id": "w09-l02-r",
+          "prompt": "R learner 的正交性最合适的解释是什么？",
+          "options": [
+            "无论另一个模型错多大，一个正确就永远足够",
+            "真值附近 nuisance 小误差的一阶影响受到控制，推断仍需具体条件",
+            "自动消除未测混杂"
+          ],
+          "answer": 1,
+          "explanation": "正交性是局部的估计稳定性性质。本节固定错误 e 的反例说明它不等同于 AIPW 的模型双重稳健；因果交换性也仍需单独论证。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "meta-learners",
+      "title": "Metalearners for estimating heterogeneous treatment effects using machine learning",
+      "authors": "Sören R. Künzel; Jasjeet S. Sekhon; Peter J. Bickel; Bin Yu",
+      "year": 2019,
+      "url": "https://doi.org/10.1073/pnas.1804597116",
+      "locator": "S、T、X 学习器的定义与适用情形"
+    },
+    {
+      "id": "r-learner",
+      "title": "Quasi-Oracle Estimation of Heterogeneous Treatment Effects",
+      "authors": "Xinkun Nie; Stefan Wager",
+      "year": 2021,
+      "url": "https://arxiv.org/abs/1712.04912",
+      "locator": "Robinson 残差损失与准 oracle 条件"
+    },
+    {
+      "id": "generalized-random-forests",
+      "title": "Generalized Random Forests",
+      "authors": "Susan Athey; Julie Tibshirani; Stefan Wager",
+      "year": 2019,
+      "url": "https://arxiv.org/abs/1610.01271",
+      "locator": "局部矩条件、森林权重与异质效应"
+    }
+  ],
+  "exerciseIds": [
+    "w09-l02-sign",
+    "w09-l02-r"
+  ],
+  "codeStatus": "verified"
+}

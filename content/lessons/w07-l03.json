@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "id": "w07-l03",
+  "week": 7,
+  "order": 3,
+  "title": "多重插补中的 TMLE 与合并",
+  "summary": "在每份插补资料上估计同一 TMLE 目标，保存方差并进行标量合并；说明 Rubin 规则及其适用边界。",
+  "status": "ready",
+  "readingMinutes": 25,
+  "tags": [
+    "相同目标",
+    "插补内分析",
+    "Rubin 合并"
+  ],
+  "objectives": [
+    "手算填补内、填补间和总方差",
+    "在合适尺度合并目标量并保留失败记录",
+    "区分 Rubin 自由度与小样本调整",
+    "解释 MI 与 TMLE 的组合仍需协调性和识别条件"
+  ],
+  "prerequisites": [
+    "w07-l01",
+    "w07-l02",
+    "w06-l02"
+  ],
+  "sections": [
+    {
+      "id": "layers",
+      "title": "缺失与因果分析的两层假设",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "沿用 A、Y 完整、基线 L 缺失的例子。多重插补试图依据已观测信息恢复缺失资料的不确定性；TMLE 在每份完成资料中估计事先指定的总体风险差。两个环节的正确性需要分别讨论。把任意插补输出交给双重稳健估计器，并不自动得到对任意缺失机制稳健的方法。"
+        },
+        {
+          "type": "list",
+          "items": [
+            "缺失层：可辩护的机制、足够辅助信息、合理的插补分布及不确定性传播。",
+            "因果层：明确干预、一致性、给定基线混杂的交换性、处理正性与目标总体。",
+            "推断层：插补与完整数据分析相协调，Uⱼ 适用于该估计器，合并规则有相应依据。"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "若一个变量实际在处理之后测量，将它作为普通基线混杂调整可能改换目标或造成偏差。插补不会改变测量时间。每一份数据中的 A、Y、W 定义必须相同；不同阈值的 A、不同随访时点的 Y 或不同人群的效应不能放到同一个合并向量。"
+        }
+      ]
+    },
+    {
+      "id": "rubin",
+      "title": "Rubin 合并的方差分解",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "Q̄=(1/m)ΣⱼQⱼ；Ū=(1/m)ΣⱼUⱼ；B=Σⱼ(Qⱼ−Q̄)²/(m−1)。"
+        },
+        {
+          "type": "equation",
+          "text": "T=Ū+(1+1/m)B；SE(Q̄)=sqrt(T)。"
+        },
+        {
+          "type": "paragraph",
+          "text": "Qⱼ 是第 j 份完成数据对同一目标的点估计；Uⱼ 是该估计的方差。Ū 衡量每份资料仍存在的抽样不确定性；B 衡量不同合理缺失值带来的估计差异；1+1/m 还反映有限插补份数的影响。若把 Uⱼ 错存成标准误，单位就不一致。"
+        },
+        {
+          "type": "paragraph",
+          "text": "合并发生在估计结果层。把三份完成资料拼成三倍独立人数，会重复计算同一人的信息。平均 p 值、平均区间端点或只报告各估计的标准差，也不等价于 Rubin 推断。"
+        }
+      ]
+    },
+    {
+      "id": "worked",
+      "title": "三份估计的手算",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "插补份",
+            "Qⱼ：风险差",
+            "Uⱼ：方差"
+          ],
+          "rows": [
+            [
+              "1",
+              "−0.08",
+              "0.0004"
+            ],
+            [
+              "2",
+              "−0.06",
+              "0.0004"
+            ],
+            [
+              "3",
+              "−0.04",
+              "0.0004"
+            ]
+          ],
+          "caption": "教学构造；各份标准误均为 0.02。"
+        },
+        {
+          "type": "paragraph",
+          "text": "Q̄=−0.06，Ū=0.0004，B=0.0004。于是 T=0.0004+(4/3)×0.0004≈0.00093333，SE≈0.03055。若仅保留 Ū，标准误会被算成 0.02。这里仅展示方差算术，三份示例不构成实际研究的推荐插补次数。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "from statistics import mean, variance\nfrom math import sqrt\nQ=[-0.08,-0.06,-0.04]\nU=[0.0004,0.0004,0.0004]\nm=len(Q)\nassert m>=2 and len(U)==m and all(u>=0 for u in U)\nqbar,ubar,b=mean(Q),mean(U),variance(Q)\ntotal=ubar+(1+1/m)*b\nold_df=(m-1)*(1+ubar/((1+1/m)*b))**2\nprint(qbar,ubar,b,total,sqrt(total),old_df)\nassert abs(total-7/7500)<1e-12\nassert abs(old_df-6.125)<1e-12",
+          "execution": "verified",
+          "caption": "原创、已执行的 Rubin 算术示例。此处只核验方差与旧式自由度，不声称检验了 MI+TMLE 的覆盖率。"
+        }
+      ]
+    },
+    {
+      "id": "degrees",
+      "title": "尺度、自由度与边界",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "νold=(m−1){1+Ū/[(1+1/m)B]}²，适用于 B>0 的旧式 Rubin 表达。"
+        },
+        {
+          "type": "paragraph",
+          "text": "本例 νold=6.125，直接使用正态临界值与采用相应 t 分布会给出不同区间。Barnard–Rubin 类小样本调整还需要合理的完整数据自由度信息，不能把上式只换个名称就说已经调整。对采用机器学习的 TMLE，完整数据自由度也不能随手定义为样本数减学习器个数。"
+        },
+        {
+          "type": "paragraph",
+          "text": "对 log OR 或 log RR，通常在 log 尺度合并估计与方差，再指数变换区间。RD 可以在风险差尺度上处理。不同量的尺度和单位须在输入前核对。软件 pool.scalar 可接收 Q、U 向量；其存在并不替代对本分析合并条件的审查。"
+        },
+        {
+          "type": "paragraph",
+          "text": "B 很小不等于插补模型正确。缺失信息少、过度确定的插补、模型限制或偶然 Monte Carlo 波动都可能让 B 小。若 B=0，旧式表达需按极限或软件规定处理；若 U 或 T 为负，应停止排错。所有份都使用同一确定填补甚至会人为令 B=0。"
+        }
+      ]
+    },
+    {
+      "id": "r-workflow",
+      "title": "逐份 TMLE 的代码讲解",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 沿用 w07-l01 的 imp。R 未执行；先核验包版本和每次拟合。\nstopifnot(requireNamespace(\"tmle\",quietly=TRUE))\nfit_one <- function(j) {\n  dj <- mice::complete(imp,j)\n  stopifnot(all(dj$A %in% 0:1),all(dj$Y %in% 0:1))\n  out <- tmle::tmle(Y=dj$Y,A=dj$A,W=dj[c(\"X\",\"L\")],\n      family=\"binomial\",Q.SL.library=c(\"SL.mean\",\"SL.glm\"),\n      g.SL.library=c(\"SL.mean\",\"SL.glm\"))\n  q <- out$estimates$ATE$psi\n  u <- out$estimates$ATE$var.psi\n  stopifnot(is.finite(q),is.finite(u),u>=0)\n  data.frame(imputation=j,Q=q,U=u)\n}\n# 有一份失败就停止并诊断，不静默过滤。\nestimates <- do.call(rbind,lapply(seq_len(imp$m),fit_one))\nm <- nrow(estimates)\nstopifnot(m==imp$m,m>=2)\nQbar <- mean(estimates$Q)\nUbar <- mean(estimates$U)\nB <- var(estimates$Q)\ntotal <- Ubar+(1+1/m)*B\nc(Qbar=Qbar,Ubar=Ubar,B=B,total=total,SE=sqrt(total))\n# 只有核查推断协调性及自由度约定后，才使用对应的合并区间。\n# mice::pool.scalar(Q=estimates$Q,U=estimates$U,n=Inf)",
+          "execution": "not-run",
+          "caption": "R 未执行。最后一行仅注明大样本完整数据自由度约定的接口位置，不能作为无条件有效区间。"
+        },
+        {
+          "type": "paragraph",
+          "text": "A、Y 以单列向量输入，W 保持协变量表。每份保存一行 Qⱼ、Uⱼ 是正确的结果汇总方式，它与把个体资料堆叠成独立大样本完全不同。还应保存重叠、学习器失败、边界预测、概率截断和随机种子等信息，以便追溯异常份。"
+        },
+        {
+          "type": "paragraph",
+          "text": "一般矩估计下，合并方差可能因插补与分析不协调而失效；Yang 与 Kim 的原始研究给出这样的边界。正式使用 MI+TMLE 时，需要为具体插补程序、完整数据估计器、样本分割和方差选择提供依据；不能只因两个软件都能运行就宣称总体推断已获保证。"
+        }
+      ]
+    },
+    {
+      "id": "reporting",
+      "title": "结果报告与敏感性",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "给出目标、缺失变量和机制假设，说明 m、迭代次数、插补模型与诊断。",
+            "报告 Q̄、Ū、B、T、实际成功份数及区间所用自由度约定。",
+            "比较合理的插补设定、重叠处理与 MNAR 偏离，区分 Monte Carlo 误差和识别不确定性。",
+            "解释风险差的单位：−0.06 为少 6 个百分点，不能直接称为相对风险少 6%。"
+          ]
+        },
+        {
+          "type": "callout",
+          "title": "显著性与识别",
+          "text": "p 值较小或区间不含零，描述的是指定模型与推断条件下的统计证据。它不能验证缺失机制、处理正性、时间顺序或无未测混杂。",
+          "tone": "warning"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w07-l03-variance",
+          "prompt": "某份输出 psi=0.03、var.psi=0.0025，合并表的 U 应填什么？",
+          "options": [
+            "0.05",
+            "0.0025",
+            "0.03"
+          ],
+          "answer": 1,
+          "explanation": "U 要存估计方差 var.psi=0.0025；0.05 是其标准误，不能与其他方差直接相加。psi 才是点估计 Q。"
+        },
+        {
+          "type": "exercise",
+          "id": "w07-l03-small-b",
+          "prompt": "20 份估计几乎相同、B 很小，能证明什么？",
+          "options": [
+            "插补一定收敛且 MAR 成立",
+            "TMLE 已消除全部缺失偏差",
+            "只说明这些完成数据间的目标估计变动很小，还需检查模型与诊断"
+          ],
+          "answer": 2,
+          "explanation": "B 是特定合并过程中的估计差异。若插补过度确定，B 也会很小。它不检验缺失机制、不证明模型充分，也不保证因果识别。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "pool-scalar",
+      "title": "Multiple imputation pooling: univariate version",
+      "authors": "mice package authors",
+      "year": "在线文档",
+      "url": "https://amices.org/mice/reference/pool.scalar.html",
+      "locator": "Q、U、合并方差与自由度"
+    },
+    {
+      "id": "mice",
+      "title": "mice: Multivariate Imputation by Chained Equations in R",
+      "authors": "Stef van Buuren; Karin Groothuis-Oudshoorn",
+      "year": 2011,
+      "url": "https://www.jstatsoft.org/article/view/v045i03",
+      "locator": "FCS、插补方法与诊断"
+    },
+    {
+      "id": "tmle",
+      "title": "tmle: An R Package for Targeted Maximum Likelihood Estimation",
+      "authors": "Susan Gruber; Mark J. van der Laan",
+      "year": 2012,
+      "url": "https://www.jstatsoft.org/article/view/v051i13",
+      "locator": "单时点处理、更新算法、效应尺度与输出"
+    },
+    {
+      "id": "mi-mom",
+      "title": "A note on multiple imputation for method of moments estimation",
+      "authors": "Shu Yang; Jae Kwang Kim",
+      "year": 2016,
+      "url": "https://arxiv.org/abs/1508.06977",
+      "locator": "矩估计、多重插补与方差协调条件"
+    }
+  ],
+  "exerciseIds": [
+    "w07-l03-variance",
+    "w07-l03-small-b"
+  ],
+  "codeStatus": "not-run"
+}

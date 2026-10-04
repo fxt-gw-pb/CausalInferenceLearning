@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#7b2939"><meta name="description" content="因果推断中文自学笔记：研究问题、识别、估计与应用。九周学习目录与原创交互示例。">
+<title>因果推断学习笔记</title>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg"><link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到正文</a>
+<aside id="sidebar" class="sidebar" aria-label="课程导航"></aside>
+<div class="shell">
+<header class="topbar">
+<button class="icon-button mobile-menu" id="menu-button" aria-label="打开课程导航" aria-haspopup="dialog">☰</button>
+<nav class="breadcrumb" aria-label="当前位置" id="breadcrumb"><span>学习空间</span><span>/</span><b>课程目录</b></nav>
+<button class="search-trigger" id="search-button" aria-haspopup="dialog"><span aria-hidden="true">⌕</span><span>搜索课程与概念</span><kbd>/</kbd></button>
+</header>
+<main id="main" tabindex="-1"><div class="loading" role="status">正在载入学习目录…</div></main>
+<footer><span>因果推断学习笔记</span><span>原创文字 · 合成示例 · 公开学术引用</span></footer>
+</div>
+<dialog id="search-dialog" class="search-dialog" aria-labelledby="search-title">
+<div class="dialog-heading"><h2 id="search-title">搜索课程与概念</h2><button class="icon-button" data-close="search-dialog" aria-label="关闭搜索">×</button></div>
+<label class="search-field"><span class="sr-only">输入课程名称或关键词</span><input id="search-input" type="search" placeholder="例如：倾向得分、标准化、TMLE" autocomplete="off"></label>
+<p class="search-help" id="search-count" role="status">按课程名称、关键词和已编写内容搜索</p>
+<div class="search-results" id="search-results"></div>
+</dialog>
+<dialog id="mobile-nav" class="mobile-nav" aria-label="课程导航"><button class="icon-button nav-close" data-close="mobile-nav" aria-label="关闭导航">×</button><div id="mobile-nav-content"></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<noscript><div class="noscript">此学习目录需要启用 JavaScript。网站无登录功能，不会上传学习记录。</div></noscript>
+<script type="module" src="./app.js"></script>
+</body></html>

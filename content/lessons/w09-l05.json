@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "id": "w09-l05",
+  "week": 9,
+  "order": 5,
+  "title": "异质性分析的 R 实现",
+  "summary": "通过一条原创、未运行的 R 流程贯通模拟、森林发现、冻结分组、独立 AIPW 评估和诊断，建立可复现分析的验收标准。",
+  "status": "ready",
+  "readingMinutes": 31,
+  "tags": [
+    "模型训练",
+    "分组",
+    "效应解释",
+    "诊断"
+  ],
+  "objectives": [
+    "审查分类编码、文件身份和变量信息集",
+    "用独立资料冻结并评估森林分组",
+    "识别重复切点、外推、方差与方向标签问题",
+    "清楚区分代码讲解、实际运行和科学结论"
+  ],
+  "prerequisites": [
+    "w09-l01",
+    "w09-l02",
+    "w09-l03",
+    "w09-l04",
+    "R glm、model.matrix 和数据索引"
+  ],
+  "sections": [
+    {
+      "id": "scope",
+      "title": "代码讲解的边界与验收目标",
+      "blocks": [
+        {
+          "type": "callout",
+          "title": "本节未运行 R",
+          "text": "本节是原创代码 walkthrough。所有 R 代码均未在当前环境执行，未生成森林、图或真实分析结果。它展示应实现和检查的流程；不能将这页当作已完成的软件复现或应用研究。",
+          "tone": "warning"
+        },
+        {
+          "type": "paragraph",
+          "text": "目标是在同一个模拟因果问题中，用一份资料发现效应分组，再用另一份独立资料估计组平均风险差。为便于审查，使用单次发现/评估分割和参数 nuisance；正式高维分析可在同样的索引原则下扩展为有依据的交叉拟合。代码不自动安装包，也不读取未知的外部资料。"
+        },
+        {
+          "type": "list",
+          "items": [
+            "所有方法使用同一 A、Y、X1、X2 和观察窗口。X1、X2 均为处理前变量。",
+            "Y=1 为不良事件，目标 RD 为处理减对照；越负意味着降低风险越多。",
+            "首先验证数据与对象依赖，再运行模型；最后检查推断和解释，不能以程序跑完替代这些步骤。"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "原创数据与明确编码",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 需要预先配置 grf；不自动下载或安装依赖。\nstopifnot(requireNamespace(\"grf\",quietly=TRUE))\nset.seed(950)\nn <- 4000L\nX1 <- runif(n,0,1)\nX2 <- rbinom(n,1,0.4)\ne_true <- plogis(-0.5+0.8*X1+0.3*X2)\nA <- rbinom(n,1,e_true)\nq0_true <- plogis(-1+0.6*X1+0.3*X2)\nq1_true <- plogis(-1+0.6*X1+0.3*X2-0.4-0.8*X1)\nY <- rbinom(n,1,ifelse(A==1,q1_true,q0_true))\nd <- data.frame(X1=X1,X2=X2,A=A,Y=Y)\ntau_true <- q1_true-q0_true  # 只在模拟中知道，用于后续诊断。\nstopifnot(!anyNA(d),all(d$A %in% 0:1),all(d$Y %in% 0:1))\ndiscovery_id <- sample.int(n,n %/% 2)\nevaluation_id <- setdiff(seq_len(n),discovery_id)\nD <- d[discovery_id,,drop=FALSE]\nE <- d[evaluation_id,,drop=FALSE]\nXD <- as.matrix(D[c(\"X1\",\"X2\")])\nXE <- as.matrix(E[c(\"X1\",\"X2\")])\nstopifnot(length(intersect(discovery_id,evaluation_id))==0)",
+          "execution": "not-run",
+          "caption": "R 未执行。这里的 X2 已明确是 0/1 数值；真实分类变量应按实际类别构建一致的设计矩阵。"
+        },
+        {
+          "type": "paragraph",
+          "text": "模拟中的处理模型和结果模型已完整给出；它们定义了教学真值，并不会出现在真实数据中。实际资料若有因子编码，应显式映射水平，不能把 as.numeric(factor) 得到的内部序号当作原有 0/1。多类别变量需要统一训练与预测阶段的列名和参考水平。"
+        },
+        {
+          "type": "paragraph",
+          "text": "未知文件名、缺少数据字典、类别标签对不上或数据版本身份不清时，应暂停依赖该资料的分析。一个同名或结构相似的文件不能自动视为原来的输入。本节通过直接模拟避免了这些未明确的数据依赖。"
+        }
+      ]
+    },
+    {
+      "id": "discovery",
+      "title": "森林发现与冻结分组",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "forest_D <- grf::causal_forest(X=XD,Y=D$Y,W=D$A,\n    num.trees=2000,honesty=TRUE,sample.fraction=0.5,seed=951)\n# 发现集 OOB 预测用于选择阈值；评估集未参与这一步。\nrank_D <- predict(forest_D)$predictions\nstopifnot(all(is.finite(rank_D)))\ncuts <- unname(quantile(rank_D,probs=c(1/3,2/3)))\nif (any(!is.finite(cuts)) || length(unique(cuts))!=2L) {\n  stop(\"预测切点重复或非法：需预先规定更少组数的处理规则\")\n}\nrank_E <- predict(forest_D,newdata=XE)$predictions\nstopifnot(all(is.finite(rank_E)))\ngroup_E <- cut(rank_E,breaks=c(-Inf,cuts,Inf),include.lowest=TRUE,\n    labels=c(\"低预测RD\",\"中预测RD\",\"高预测RD\"))\ntable(group_E)\ntable(group_E,E$A)",
+          "execution": "not-run",
+          "caption": "R 未执行。分界值来自发现集；这里未根据评估集效应重新调整阈值。"
+        },
+        {
+          "type": "paragraph",
+          "text": "评估集三组人数不必相等，因为切点已经在发现集冻结。将评估集重新分成等人数，虽可能只使用其 X 预测，也会改变规则与目标；本例为保持最简单的条件推断而保留发现集的数值阈值。重复切点说明预测缺少足够分辨度，不能用随机打散悄悄制造五个不同效果组。"
+        },
+        {
+          "type": "paragraph",
+          "text": "按预测 RD 从小到大使用中性标签。对于不良结局，低预测 RD 通常对应较大的预计绝对获益；这个方向应由事件编码核对。组内真实效应还需要下一步独立估计，不能先把所有分组命名为已确认的疗效等级。"
+        }
+      ]
+    },
+    {
+      "id": "nuisance",
+      "title": "独立 nuisance 与 AIPW 得分",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 两个模型仅使用发现集拟合，与本例模拟结构相容。\nfit_e <- glm(A ~ X1+X2,data=D,family=binomial())\nfit_q <- glm(Y ~ A*X1+X2,data=D,family=binomial())\nstopifnot(isTRUE(fit_e$converged),isTRUE(fit_q$converged))\nehat <- predict(fit_e,newdata=E,type=\"response\")\nq0 <- predict(fit_q,newdata=transform(E,A=0),type=\"response\")\nq1 <- predict(fit_q,newdata=transform(E,A=1),type=\"response\")\nstopifnot(all(is.finite(ehat)),all(is.finite(q0)),all(is.finite(q1)))\nif (any(ehat<=0 | ehat>=1)) stop(\"非法倾向概率，需要检查模型\")\ngamma <- q1-q0 + E$A*(E$Y-q1)/ehat -\n    (1-E$A)*(E$Y-q0)/(1-ehat)\nstopifnot(all(is.finite(gamma)))\nby(ehat,group_E,summary)",
+          "execution": "not-run",
+          "caption": "R 未执行。真实分析可能需要更灵活模型；若采用截断，应事先规定、记录并作敏感性检查。"
+        },
+        {
+          "type": "paragraph",
+          "text": "模型选择、训练和阈值都在发现集完成。评估集 Y 只进入最终分数和效应估计。此结构让分析容易追踪，但样本被分开后信息减少；nuisance 估计误差仍须满足相应的一阶推断条件。简单分割并不保证任意机器学习器都收敛得足够快。"
+        }
+      ]
+    },
+    {
+      "id": "group-estimates",
+      "title": "组效应、组差与模拟真值",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "group_summary <- lapply(levels(group_E),function(g) {\n  keep <- which(group_E==g)\n  z <- gamma[keep]\n  ng <- length(z)\n  if (ng<2L || length(unique(E$A[keep]))<2L) {\n    stop(paste(\"组样本或处理支持不足：\",g))\n  }\n  est <- mean(z)\n  se <- sd(z)/sqrt(ng)\n  data.frame(group=g,n=ng,treated=sum(E$A[keep]),estimate=est,se=se,\n      lower=est-1.96*se,upper=est+1.96*se)\n})\nresult <- do.call(rbind,group_summary)\nresult\n# 本例互斥冻结组的一阶差值；正式分析须核查其推断条件。\ncontrast <- result$estimate[1]-result$estimate[3]\ncontrast_se <- sqrt(result$se[1]^2+result$se[3]^2)\nc(difference=contrast,se=contrast_se)\n# 仅模拟中可作此比较：有限评估样本中真 CATE 的组平均。\ntapply(tau_true[evaluation_id],group_E,mean)\npackageVersion(\"grf\")\nsessionInfo()",
+          "execution": "not-run",
+          "caption": "R 未执行。模拟真 CATE 的样本均值用于诊断，和未知总体组效应仍有抽样区别。"
+        },
+        {
+          "type": "paragraph",
+          "text": "估计曲线或组间差异存在噪声，不能要求每一次模拟都恰好按预计方向显著。更完整的验证应重复独立模拟，记录偏差、RMSE、区间覆盖率、组大小、失败频率和运行时间。单次成功运行只检查一个计算实例。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若进一步采用组内 TMLE，须另外实现该目标的更新、方差和诊断，并明确其样本使用规则。不能把上面的 gamma 均值重新命名为 TMLE；也不能仅对森林预测调用 mean 就称为双重稳健估计。"
+        }
+      ]
+    },
+    {
+      "id": "debug",
+      "title": "复现与解释的排错清单",
+      "blocks": [
+        {
+          "type": "table",
+          "headers": [
+            "发现的问题",
+            "应做的核查"
+          ],
+          "rows": [
+            [
+              "读入文件缺失或版本不明",
+              "核对来源与数据字典；不静默改名假定一致"
+            ],
+            [
+              "各模型 X 不同",
+              "统一信息集或明确比较目标已改变"
+            ],
+            [
+              "组内只做单变量回归",
+              "继续评估残余混杂与目标尺度"
+            ],
+            [
+              "PDP 的人群分位称为置信区间",
+              "改正带的含义，或采用适当重复拟合推断"
+            ],
+            [
+              "分类编码成 1/2 后当 0/1",
+              "按照真实类别显式映射并断言"
+            ],
+            [
+              "森林平均预测被当作精确组效应",
+              "确认估计器、样本外评估和标准误对象"
+            ],
+            [
+              "处理分数接近边界",
+              "查组内支持与数值问题，报告敏感性"
+            ],
+            [
+              "看到验证集后调整组数",
+              "记录探索，并使用新的确认性评估"
+            ]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "疾病风险评分分组、元学习器、森林、整体 ATE 与组内估计可组成一个研究流程，但每一步应保留自己的目标。SHAP 等解释工具可作为选做；在没有完整执行记录时，不应编造变量重要性排名、图形或估计结果。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w09-l05-order",
+          "prompt": "发现集 τ̂ 的低分位组是最负的一组，Y=1 表示不良事件。应怎样标记？",
+          "options": [
+            "已证实疗效最差",
+            "低预测风险差，预计获益较大，仍待组效应评估",
+            "最高事件风险"
+          ],
+          "answer": 1,
+          "explanation": "负风险差表示减少事件，越负代表预测绝对获益越大。它与基线事件风险不是同一评分，也不能在验证前称为已证实的疗效。"
+        },
+        {
+          "type": "exercise",
+          "id": "w09-l05-status",
+          "prompt": "本节提供完整 R 代码但尚未执行，最准确的完成状态是什么？",
+          "options": [
+            "已复现因果森林应用",
+            "代码讲解已写成，运行兼容性和统计表现待验证",
+            "只要设置种子就等于已运行"
+          ],
+          "answer": 1,
+          "explanation": "种子使未来同环境运行可重复，但不会实际执行代码或验证包接口。数据模拟、模型拟合、数值检查和覆盖率研究是不同验收阶段。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "grf-causal-forest",
+      "title": "Causal forest",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/reference/causal_forest.html",
+      "locator": "Y.hat, W.hat, honesty, sample.fraction, prediction"
+    },
+    {
+      "id": "grf-algorithm",
+      "title": "The GRF Algorithm",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/REFERENCE.html",
+      "locator": "Training, Orthogonalization, Prediction, Variance Estimates"
+    },
+    {
+      "id": "grf-average-effects",
+      "title": "Get doubly robust estimates of average treatment effects",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/reference/average_treatment_effect.html",
+      "locator": "AIPW、TMLE、target.sample 与 subset 条件"
+    },
+    {
+      "id": "grf-importance",
+      "title": "Calculate variable importance",
+      "authors": "grf authors",
+      "year": "在线文档",
+      "url": "https://grf-labs.github.io/grf/reference/variable_importance.html",
+      "locator": "深度加权的分裂次数"
+    },
+    {
+      "id": "meta-learners",
+      "title": "Metalearners for estimating heterogeneous treatment effects using machine learning",
+      "authors": "Sören R. Künzel; Jasjeet S. Sekhon; Peter J. Bickel; Bin Yu",
+      "year": 2019,
+      "url": "https://doi.org/10.1073/pnas.1804597116",
+      "locator": "S、T、X 学习器的定义与适用情形"
+    }
+  ],
+  "exerciseIds": [
+    "w09-l05-order",
+    "w09-l05-status"
+  ],
+  "codeStatus": "not-run",
+  "statusNote": "本节为未运行的 R 代码讲解，不含模型输出或复现结论。"
+}

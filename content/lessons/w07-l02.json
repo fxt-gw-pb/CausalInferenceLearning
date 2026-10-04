@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 1,
+  "id": "w07-l02",
+  "week": 7,
+  "order": 2,
+  "title": "多重插补中的匹配与加权",
+  "summary": "按每份插补资料重新估计倾向得分，完成匹配或加权及诊断，保持暴露方向、目标人群和效应尺度一致。",
+  "status": "ready",
+  "readingMinutes": 24,
+  "tags": [
+    "插补模型",
+    "within 流程",
+    "平衡诊断"
+  ],
+  "objectives": [
+    "正确安排插补、设计、估计和合并的顺序",
+    "在每份数据检查平衡、重叠和有效样本量",
+    "解释 within 与 across 的不同",
+    "识别公式中处理与结局的角色错位"
+  ],
+  "prerequisites": [
+    "w07-l01",
+    "w03-l01",
+    "匹配、IPW 与边际风险差"
+  ],
+  "sections": [
+    {
+      "id": "estimand",
+      "title": "处理角色与目标人群",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "沿用上一节的模拟：A 是二元干预，Y 是事件，X、L 为基线混杂因素，L 部分缺失。倾向得分必须预测 A，记 eⱼ(X,L)=P(A=1∣X,L)；下标 j 指第 j 份完成数据。结局分析围绕 Y 进行。为了迁就二分类接口而把二元 Y 改作处理变量，会更换科学问题。"
+        },
+        {
+          "type": "equation",
+          "text": "处理模型：A ~ X + L；结果目标：E[Y(1)−Y(0)]。"
+        },
+        {
+          "type": "paragraph",
+          "text": "普通最近邻匹配常以处理者为目标，可能在卡钳限制后进一步排除一部分处理者；ATE 加权则针对全体。即使都用同一个原始数据，这些目标人群也可能不同。比较前先统一 estimand，再比较估计器。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "设计",
+            "典型权重/对象",
+            "需要报告"
+          ],
+          "rows": [
+            [
+              "ATE IPW",
+              "A/e+(1−A)/(1−e)",
+              "总体目标、重叠与权重分布"
+            ],
+            [
+              "ATT 加权",
+              "A+(1−A)e/(1−e)",
+              "处理者目标与对照支持"
+            ],
+            [
+              "匹配",
+              "由匹配算法产生配对/权重",
+              "目标、距离、卡钳、匹配比例和未匹配对象"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "within",
+      "title": "插补内分析的完整顺序",
+      "blocks": [
+        {
+          "type": "list",
+          "items": [
+            "先按适当机制与模型产生 m 份完成资料。对协变量插补保留 A、Y 的相关信息。",
+            "对每一份资料 j 独立估计 eⱼ，并执行预先规定的匹配或加权设计。",
+            "逐份检查处理组与对照组的协变量平衡、重叠、权重尾部及有效样本量。",
+            "逐份估计同一个因果目标 Qⱼ，并用适合该完整数据方法的 Uⱼ 表达采样方差。",
+            "确认目标与方差处理可协调后，合并 Qⱼ、Uⱼ，同时报告诊断差异和失败。"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "这称为 within 流程。across 的常见做法先把同一人的多份倾向得分平均，再在一个设计中使用。平均的得分一般不保留每一份完整数据所需的平衡性质；已有比较研究在其考察情景中发现 within 更可靠。它仍不是无条件有效的定理：插补模型、完整数据估计与合并方差仍须合理。"
+        },
+        {
+          "type": "paragraph",
+          "text": "不同完成资料可能给某人的 L 不同值，重新拟合得分与权重正是把这种不确定性传递到设计的一个环节。若把第一份的权重机械复制到所有份，后续估计之间的变动将遗漏这一来源。"
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "title": "每份资料的平衡与重叠",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "ESS=(Σᵢwᵢ)²/Σᵢwᵢ²。",
+          "caption": "权重有效样本量是集中程度的诊断；应按处理组分别计算。"
+        },
+        {
+          "type": "paragraph",
+          "text": "标准化均数差 SMD 用统一约定的标准差标尺比较加权前后两组均值。必须说明分母、二元变量处理和是否使用绝对值。常见 |SMD|<0.1 是经验诊断线，不能证明所有混杂已控制。还应检查重要交互、非线性、分布尾部与未测混杂的可能性。"
+        },
+        {
+          "type": "paragraph",
+          "text": "把各插补份的平均 SMD 画出来可能掩盖某一份的严重失衡。可以展示逐份结果，或以最大绝对 SMD 做保守汇总，并同时保留原始诊断。匹配时还要查看每份损失了哪些对象；若排除的人群大幅变化，要重新审视是否仍在估计同一科学目标。"
+        },
+        {
+          "type": "code",
+          "language": "python",
+          "code": "def ess(w): return sum(w)**2/sum(x*x for x in w)\nbalanced=[1,1,1,1,1]\nconcentrated=[1,1,1,1,16]\nprint(ess(balanced),ess(concentrated))\nassert ess(balanced)==5\nassert abs(ess(concentrated)-20/13)<1e-12",
+          "execution": "verified",
+          "caption": "原创权重集中算例，已执行。两个向量都有 5 个观测，ESS 分别为 5 和约 1.54。"
+        },
+        {
+          "type": "paragraph",
+          "text": "权重截断可降低极端权重的影响，但同时引入偏差或改变近似目标。应事先说明阈值并做敏感性比较。不能只把图调到好看，就宣布弱正性已解决。"
+        }
+      ]
+    },
+    {
+      "id": "r-diagnostics",
+      "title": "独立重写的 within 加权检查",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "r",
+          "code": "# 先按 w07-l01 建立 imp；本段不安装包、不合并未经核查的方差。\nsummaries <- vector(\"list\", imp$m)\nrisk_rows <- vector(\"list\", imp$m)\nfor (j in seq_len(imp$m)) {\n  dj <- mice::complete(imp,j)\n  psfit <- glm(A ~ X + L, data=dj, family=binomial())\n  ej <- predict(psfit,type=\"response\")\n  if (any(!is.finite(ej)) || any(ej<=0 | ej>=1)) {\n    stop(paste(\"需要检查倾向模型，插补份：\",j))\n  }\n  wj <- ifelse(dj$A==1,1/ej,1/(1-ej))\n  ess <- function(w) sum(w)^2/sum(w^2)\n  summaries[[j]] <- data.frame(imputation=j,\n      min_e=min(ej),max_e=max(ej),max_weight=max(wj),\n      ess1=ess(wj[dj$A==1]),ess0=ess(wj[dj$A==0]))\n  risk <- sapply(0:1,function(a)\n      weighted.mean(dj$Y[dj$A==a],wj[dj$A==a]))\n  risk_rows[[j]] <- data.frame(imputation=j,p0=risk[1],p1=risk[2],\n      risk_difference=risk[2]-risk[1])\n  # 另行用同一定义的 SMD/分布诊断检查 X、L 的加权平衡。\n}\ndo.call(rbind,summaries)\ndo.call(rbind,risk_rows)",
+          "execution": "not-run",
+          "caption": "R 未执行；展示每份设计与 Hájek 风险差点估计。此段尚未计算可用于 Rubin 合并的完整数据方差。"
+        },
+        {
+          "type": "paragraph",
+          "text": "分母各自归一化的两组加权风险称为 Hájek 形式，与未经归一化的 Horvitz–Thompson 形式有限样本上不同。上面的代码明确使用前者。此处没有将权重视作完全已知后随手构造 Uⱼ；正式推断需选取与估计得分、设计及样本结构匹配的方法。"
+        },
+        {
+          "type": "paragraph",
+          "text": "使用 MatchThem 等封装可以减少循环工作，但公式左侧、within/across、estimand、距离尺度和失败记录仍由分析者负责。对匹配或其他非光滑步骤，也不能无条件假定普通 bootstrap 与 Rubin 合并一定有效；应采用该方法的专门推断依据。"
+        }
+      ]
+    },
+    {
+      "id": "matching",
+      "title": "匹配设置的可解释性",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "卡钳 0.2 必须附上距离尺度，例如 logit 倾向得分的 0.2 个标准差；它不能直接解释成 5% 或 20% 的倾向概率差。更窄的卡钳通常减少可接受配对，可能改善局部匹配但损失样本与外推范围。名义 1:2 匹配也不保证每位处理者最终得到两个对照。"
+        },
+        {
+          "type": "paragraph",
+          "text": "如果某份资料的处理者缺乏对照支持，不能静默把该份删掉再将剩余 m 改小。应保留失败、诊断插补模型和设计问题，并决定预先规定的修正或目标限制。各份完成资料只让缺失值变得可供分析，并不创造原来不存在的处理重叠。"
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "title": "自测与反馈",
+      "blocks": [
+        {
+          "type": "exercise",
+          "id": "w07-l02-role",
+          "prompt": "目标为 A 对 Y 的风险差。某程序先拟合 glm(Y ~ X + L)，用预测值构造所谓处理权重，再拟合 Y ~ A。主要问题是什么？",
+          "options": [
+            "没有增加更多树",
+            "倾向模型预测了结局，不能据此平衡 A 组的混杂因素",
+            "只需把变量名改成 propensity"
+          ],
+          "answer": 1,
+          "explanation": "处理倾向为 P(A=1∣W)，预测结局得到的是另一种评分。它可能有特定设计用途，但未提供相应识别论证时，不能当作该干预的 IPW 权重。"
+        },
+        {
+          "type": "exercise",
+          "id": "w07-l02-balance",
+          "prompt": "20 份插补的平均绝对 SMD 为 0.04，但最大值为 0.28。合理下一步是什么？",
+          "options": [
+            "只报告平均值",
+            "逐份找出失衡变量和设计原因，核对目标与模型",
+            "删除 SMD 最大的一份"
+          ],
+          "answer": 1,
+          "explanation": "平均值可能掩盖严重个别失衡。应检查具体份、协变量支持、模型和插补过程；按结果删掉某份会造成选择且遗漏不确定性。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "within-mi",
+      "title": "Avoiding pitfalls when combining multiple imputation and propensity scores",
+      "authors": "Emily Granger; Jamie C. Sergeant; Mark Lunt",
+      "year": 2019,
+      "url": "https://doi.org/10.1002/sim.8355",
+      "locator": "Within / Across 比较及其研究条件"
+    },
+    {
+      "id": "mice",
+      "title": "mice: Multivariate Imputation by Chained Equations in R",
+      "authors": "Stef van Buuren; Karin Groothuis-Oudshoorn",
+      "year": 2011,
+      "url": "https://www.jstatsoft.org/article/view/v045i03",
+      "locator": "FCS、插补方法与诊断"
+    },
+    {
+      "id": "mice-doc",
+      "title": "mice function reference",
+      "authors": "mice package authors",
+      "year": "在线文档",
+      "url": "https://amices.org/mice/reference/mice.html",
+      "locator": "method, predictorMatrix, m, maxit, passive imputation"
+    },
+    {
+      "id": "pool-scalar",
+      "title": "Multiple imputation pooling: univariate version",
+      "authors": "mice package authors",
+      "year": "在线文档",
+      "url": "https://amices.org/mice/reference/pool.scalar.html",
+      "locator": "Q、U、合并方差与自由度"
+    }
+  ],
+  "exerciseIds": [
+    "w07-l02-role",
+    "w07-l02-balance"
+  ],
+  "codeStatus": "not-run"
+}

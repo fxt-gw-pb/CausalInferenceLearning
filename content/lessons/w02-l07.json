@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "id": "w02-l07",
+  "week": 2,
+  "order": 7,
+  "title": "回归控制混杂：模型解释",
+  "summary": "从模型预测解释主效应、交互和标准化对比，避免把logistic系数、风险差及HR混为一个答案。",
+  "status": "ready",
+  "readingMinutes": 22,
+  "tags": [
+    "模型系数",
+    "效果尺度",
+    "调整集"
+  ],
+  "objectives": [
+    "在交互模型中解释指定协变量值下的处理系数。",
+    "从两组预测风险计算边际效果。",
+    "解释模型序列的可比性及生存尺度的边界。"
+  ],
+  "prerequisites": [
+    "w02-l02、w02-l05、w02-l06"
+  ],
+  "sections": [
+    {
+      "id": "interaction",
+      "title": "主效应对应参考条件",
+      "blocks": [
+        {
+          "type": "equation",
+          "text": "logit Q(A,W) = β₀ + β_A A + β_W W + β_AW A×W",
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "在这个二元W模型里，β_A是W=0时的条件log-OR；W=1时的条件log-OR为β_A+β_AW。交互项让处理对比随W变化，并没有把某个真实效果从主系数中拿走。主系数的含义由参考值决定。"
+        },
+        {
+          "type": "paragraph",
+          "text": "若W为连续年龄，A主系数对应年龄0，可能不是研究者关心的人群。把年龄中心化为年龄减去60，可让主系数对应60岁；中心化改变系数解释的位置，不应改变同一个人输入模型后的预测。"
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "title": "同一合成表中的多个效果",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "沿用上一课的合成风险：W=0时无提醒风险0.20、提醒风险0.10；W=1时分别0.50和0.30。总体中两层各占一半。"
+        },
+        {
+          "type": "table",
+          "headers": [
+            "对象",
+            "W=0",
+            "W=1",
+            "全体等权标准化"
+          ],
+          "rows": [
+            [
+              "风险差",
+              "−.10",
+              "−.20",
+              "−.15"
+            ],
+            [
+              "风险比",
+              ".50",
+              ".60",
+              ".20/.35≈.5714"
+            ],
+            [
+              "优势比",
+              "(0.1/0.9)/(0.2/0.8)=.4444",
+              "(0.3/0.7)/(0.5/0.5)=.4286",
+              "(0.2/0.8)/(0.35/0.65)≈.4643"
+            ]
+          ],
+          "caption": ""
+        },
+        {
+          "type": "paragraph",
+          "text": "全体提醒风险为0.20，对照风险为0.35。边际风险比来自两个平均风险之比，并非两层风险比的算术平均0.55；边际OR也没有理由等于某个条件OR。报告时必须写明人群及尺度。"
+        }
+      ]
+    },
+    {
+      "id": "r",
+      "title": "以预测对比为共同接口",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "R",
+          "execution": "not-run",
+          "code": "# 原创合成1000人；W为处理前风险层，Y为30天失约。\ncells <- data.frame(A=c(0,0,1,1), W=c(0,1,0,1),\n                    n=c(400,100,100,400), events=c(80,50,10,120))\nd <- do.call(rbind, lapply(seq_len(nrow(cells)), function(j) {\n  z <- cells[j, ]\n  data.frame(A=rep(z$A,z$n), W=rep(z$W,z$n),\n             Y=c(rep(1,z$events),rep(0,z$n-z$events)))\n}))\nrownames(d) <- NULL\nd$id <- seq_len(nrow(d))\nfit <- glm(Y ~ A * W, data=d, family=binomial(), na.action=na.fail)\nnew1 <- transform(d, A=1)\nnew0 <- transform(d, A=0)\np1 <- predict(fit, newdata=new1, type=\"response\")\np0 <- predict(fit, newdata=new0, type=\"response\")\nmu1 <- mean(p1); mu0 <- mean(p0)\nout <- c(risk1=mu1, risk0=mu0, RD=mu1-mu0, RR=mu1/mu0,\n         OR=(mu1/(1-mu1))/(mu0/(1-mu0)))\nout\nstopifnot(abs(out[\"RD\"] + .15) < 1e-6,\n          all(p1 >= 0 & p1 <= 1), all(p0 >= 0 & p0 <= 1))",
+          "caption": "原创 base R 练习；当前环境未执行。"
+        },
+        {
+          "type": "paragraph",
+          "text": "type=\"response\"返回风险尺度。若不指定，predict.glm默认返回链接尺度的线性预测量，平均后不能称为风险。两份newdata由同一d生成，只有A改变，确保比较的协变量构成相同。本例A、W全交互模型可拟合四格风险；更复杂数据中的函数形式是否合适仍需检查。"
+        }
+      ]
+    },
+    {
+      "id": "sequence",
+      "title": "粗模型、部分调整和完整调整",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "多模型结果表可以说明估计对若干合理选择的敏感程度，但需保持结局、人群和尺度可比。若模型1用了1000人、模型2因新增变量缺失只用了700人，估计变化同时混合了协变量调整和样本改变。应报告每个模型人数，必要时在共同分析样本中进行对照。"
+        },
+        {
+          "type": "paragraph",
+          "text": "调整前后相似不能证明无偏；不同也不能单独证明某变量造成混杂。尤其OR和HR有非可折叠性，条件和边际比较本就可能不同。合理的模型序列来自研究方案，而非选择最显著或最符合预期的一行。"
+        }
+      ]
+    },
+    {
+      "id": "survival",
+      "title": "在生存资料中保留时间信息",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "若结局是首次失约或首次返院的时间，需要记录共同时间零点、事件定义、时间单位、随访截止与删失。Cox模型的HR比较尚在风险集中的瞬时事件率；到30天发生事件的风险Fₐ(30)才是固定窗口累计概率。两者没有简单的一般互换公式。"
+        },
+        {
+          "type": "equation",
+          "text": "固定时间风险差 = F₁(t)−F₀(t)；存活概率 Sₐ(t)=1−Fₐ(t)",
+          "caption": "此处无竞争事件；若存在竞争事件，须先定义相应累计发生率。"
+        },
+        {
+          "type": "paragraph",
+          "text": "假想两种策略30天事件风险为20%和30%，风险差为−10个百分点，风险比为2/3。仅凭这两个数无法唯一确定整个随访期的HR。反过来报告HR=0.7，也不能直接写成30天风险降低30%。采用Cox预测做标准化还需处理删失、支持、模型和估计不确定性。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l07-interaction",
+          "prompt": "含A×W交互，β_A=−0.8、β_AW=0.3。在W=1时的条件OR是：",
+          "options": [
+            "exp(−0.8)",
+            "exp(−0.5)",
+            "−0.5个百分点"
+          ],
+          "answer": 1,
+          "explanation": "W=1时log-OR为−0.8+0.3=−0.5，再取指数。该结果仍是条件优势比，不是风险差。"
+        },
+        {
+          "type": "exercise",
+          "id": "w02-l07-predict",
+          "prompt": "predict.glm返回默认链接尺度预测时，直接取平均应称为：",
+          "options": [
+            "平均预测风险",
+            "平均线性预测量，尚未转回风险",
+            "ATE"
+          ],
+          "answer": 1,
+          "explanation": "logistic链接尺度是log-odds。需要type=\"response\"逐人转回概率，再对同一人群平均。"
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "id": "r-predict.glm",
+      "title": "R Documentation: predict.glm",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/predict.glm.html",
+      "locator": "type：默认link与response"
+    },
+    {
+      "id": "r-glm",
+      "title": "R Documentation: glm",
+      "authors": "R Core Team",
+      "year": "在线文档，2026-10-04查阅",
+      "url": "https://stat.ethz.ch/R-manual/R-devel/library/stats/html/glm.html",
+      "locator": "交互公式与拟合对象"
+    },
+    {
+      "id": "hernan-robins-2020",
+      "title": "Causal Inference: What If",
+      "authors": "Miguel A. Hernán; James M. Robins",
+      "year": 2020,
+      "url": "https://miguelhernan.org/whatifbook",
+      "locator": "第13章：标准化；第15章：Outcome regression and propensity scores；第17章：因果生存分析"
+    }
+  ],
+  "exerciseIds": [
+    "w02-l07-interaction",
+    "w02-l07-predict"
+  ],
+  "codeStatus": "not-run"
+}
