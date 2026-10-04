@@ -12,6 +12,12 @@ Publication snapshot: 2026-10-04 UTC.
 
 These checks are separate from live browser inspection and do not guarantee the absence of future defects.
 
+## Live browser checks
+
+The public GitHub Pages site was inspected in Chromium. Verified: all 39 authored lesson routes; 9 chapters and expand/collapse; literal search, search navigation and native Escape; bookmark, completion and answer persistence; empty/wrong/correct self-check feedback; exact code clipboard copy; slider endpoints and reset; saved view and Back/Forward; native MathML boxes; navigation-menu close and navigation.
+
+Desktop layout was inspected at 1180 CSS pixels. Enlarged text was checked at 200%, and all 39 lessons were checked at a 393-CSS-pixel viewport using 300% browser zoom, with no horizontal page overflow. This tests narrow-screen reflow; it is not a physical-device or touch-hardware test. Mobile-menu and search flows worked at this narrow width.
+
 ## Browser check list
 
 Recheck the deployed GitHub Pages URL after every material UI change:
@@ -26,7 +32,7 @@ Recheck the deployed GitHub Pages URL after every material UI change:
 - Desktop and narrow/mobile layout, menu open/close, no horizontal page overflow
 - Native MathML layout and readable fallback equations
 - Keyboard focus, 200% enlargement, reduced motion and screen-reader behavior
-- Browser errors and all eight public assets loading successfully
+- Browser errors and all seven runtime assets loading successfully (`.nojekyll` is build metadata)
 
 ## Recheck commands
 

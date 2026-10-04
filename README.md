@@ -1,5 +1,7 @@
 # 因果推断学习笔记
 
+[打开学习网站](https://fxt-gw-pb.github.io/CausalInferenceLearning/)
+
 一套中文因果推断自学网站。从研究问题、潜在结果与 DAG 开始，逐步进入标准化、倾向得分、机器学习、双重稳健估计、TMLE 和拓展应用。
 
 ## 内容与功能
